@@ -1,6 +1,6 @@
 "use strict";
 // ---------- config ----------
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const DATA_URL = "data/lt.json";
 const SEARCH_KM = 25;          // look this far (straight line); the cost model decides what is worth it
 const ROAD_FACTOR = 1.3;       // roads are ~30% longer than a straight line
@@ -63,7 +63,7 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
 map.on("style.load", () => {
   try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
-  try { map.setSky({ "sky-color": "#a9d4ff", "horizon-color": "#e6f2ff", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
+  try { map.setSky({ "sky-color": "#0b1530", "horizon-color": "#1e3a5f", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
 });
 
 function geojson() {
@@ -85,17 +85,17 @@ function addLayers() {
     paint: {
       "circle-color": ["get", "c"],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 3, 10, 5, 14, 8],
-      "circle-stroke-color": "#fff", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 12, 1.5],
+      "circle-stroke-color": "#0b1220", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 12, 1.5],
       "circle-sort-key": ["get", "known"],
     } });
   map.addLayer({ id: "selected", type: "circle", source: "chargers", filter: ["==", ["get", "i"], -1],
-    paint: { "circle-color": ["get", "c"], "circle-radius": 13, "circle-stroke-color": "#0f172a", "circle-stroke-width": 3 } });
+    paint: { "circle-color": ["get", "c"], "circle-radius": 13, "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
   map.addLayer({ id: "labels", type: "symbol", source: "chargers", minzoom: 12.5, filter: ["==", ["get", "known"], 1],
     layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12,
       "text-offset": [0, 1.3], "text-anchor": "top", "text-allow-overlap": false },
-    paint: { "text-color": "#0f172a", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
+    paint: { "text-color": "#f1f5f9", "text-halo-color": "#0b1220", "text-halo-width": 1.8 } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#7c3aed", "#2563eb"], "circle-radius": 9, "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#7c3aed", "#2563eb"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
   map.on("click", "chargers", e => select(e.features[0].properties.i, false));
   map.on("mouseenter", "chargers", () => map.getCanvas().style.cursor = "pointer");
   map.on("mouseleave", "chargers", () => map.getCanvas().style.cursor = "");
@@ -131,10 +131,10 @@ function select(i, fly = true) {
       <span class="tag" style="background:${colourOf(p)}">${levelOf(p)}</span>
     </div>
     <div class="d-actions">
-      <button class="go" id="dNav">🧭 ${t.navigate}</button>
+      <button class="go" id="dNav"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg> ${t.navigate}</button>
       <button class="secondary" id="dClose">${t.close}</button>
     </div>
-    ${l.offers.length > 1 ? `<div class="inf">ℹ️ ${t.manyCompanies(l.offers.length, priced)}</div>` : ""}
+    ${l.offers.length > 1 ? `<div class="inf">${t.manyCompanies(l.offers.length, priced)}</div>` : ""}
     ${l.offers.some(x => x.pk) ? `<div class="warn">${t.parkingWarn}</div>` : ""}
     ${l.offers.some(x => x.fx) ? `<div class="warn">${t.fixedWarn}</div>` : ""}
     ${l.offers.some(x => x.fo) ? `<div class="inf">${t.freeOptInfo}</div>` : ""}
@@ -222,7 +222,7 @@ async function bestCharge() {
       <div class="meta"><b>${x.o.op}</b> · ${townOf(x.l)} · ${t.away(x.c.oneWay.toFixed(1))}<br>
         <span class="breakdown">${t.breakdown(money(x.c.charge), money(x.c.trip))} · ${kwhPrice(x.p)}${x.o.pk || x.o.fx ? " · " + t.extraFees : ""}</span>
         ${badge ? "<br>" + badge : ""}</div>
-      <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}">🧭</button>
+      <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
     </div>`;
   }).join("") + `<div class="note">${t.tripNote(money(car.wear), money(car.timeVal), car.cons)}${freeN ? " " + t.freeNearby(freeN) : ""}</div>`;
   $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
