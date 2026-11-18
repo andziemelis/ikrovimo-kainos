@@ -4,6 +4,8 @@ A mobile-first website that shows electric-car charging prices across Lithuania 
 
 - Map: [MapLibre GL JS](https://maplibre.org) with free [OpenFreeMap](https://openfreemap.org) tiles (no API key)
 - Data: Lithuania's national charging database, published as open data by [AB Via Lietuva](https://ev.vialietuva.lt/en/data-provision) (CC BY 4.0)
+- Map view: 3D globe (spin, tilt and rotate with two fingers)
+- Ranking: total cost = charge + trip there and back (electricity, car wear, your time), from your location, a saved home or a city
 - Navigation: hands off to Google Maps, Waze or Apple Maps
 - Languages: Lithuanian and English
 - No backend, no accounts, no cookies: it's a static site

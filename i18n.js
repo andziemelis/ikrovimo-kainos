@@ -1,6 +1,33 @@
 // UI text in Lithuanian and English. Numbers and prices are formatted in app.js.
 const I18N = {
   lt: {
+    fromLbl: "Iš:",
+    originMe: "📍 Mano vieta",
+    originHome: "🏠 Namai",
+    originMeShort: "jūsų vieta",
+    originHomeShort: "namai",
+    resultsFrom: (label, kwh) => `Pigiausia iš viso (${kwh} kWh + kelionė) · pradžia: ${label}`,
+    away: k => `~${k} km`,
+    breakdown: (c, t) => `įkrovimas ${c} + kelionė ${t}`,
+    vsNearest: a => `${a} pigiau nei artimiausia`,
+    isNearest: "Artimiausia",
+    tripNote: (wear, time, cons) => `Kelionės kaina – tai elektra kelionei pirmyn ir atgal (${cons} kWh/100 km), automobilio dėvėjimasis (${wear}/km) ir jūsų laikas (${time}/val.). Pakeisti galite per 🚗 ⚙️.`,
+    freeNearby: n => `Netoliese yra ir nemokamų vietų (${n}, mėlynos žemėlapyje), bet jos dažnai skirtos tik klientams ar gyventojams.`,
+    detailTrip: (label, k, trip, total) => `Pradžia: ${label} · ~${k} km pirmyn ir atgal · kelionė ${trip} · iš viso ${total}`,
+    needHome: "Pirmiausia nustatykite namų vietą.",
+    homeTitle: "🏠 Namų vieta",
+    homeUseLoc: "Mano dabartinė vieta",
+    homeUseCentre: "Žemėlapio centras",
+    homeClear: "Ištrinti namų vietą",
+    homeSet: town => `Nustatyta: ${town}. Saugoma tik šiame įrenginyje.`,
+    homeNotSet: "Dar nenustatyta. Ji bus saugoma tik šiame įrenginyje.",
+    homeSaved: "Namų vieta išsaugota",
+    carTitle: "🚗 Jūsų automobilis",
+    carHint: "Naudojama skaičiuojant, ar verta važiuoti toliau dėl pigesnės kainos.",
+    consLbl: "Sąnaudos",
+    wearLbl: "Dėvėjimasis ir priežiūra",
+    timeLbl: "Jūsų laiko vertė",
+    saveBtn: "Išsaugoti",
     appName: "Įkrovimo kainos",
     bestCharge: "⚡ Pigiausias įkrovimas",
     nearMe: "📍 Šalia manęs",
@@ -46,10 +73,37 @@ const I18N = {
       <p>Tai ankstyva programėlės versija, padedanti rasti pigiausią elektromobilio įkrovimą Lietuvoje.</p>
       <p><b>Kainos</b> – tai operatorių paskelbti tarifai iš Lietuvos nacionalinės įkrovimo prieigų duomenų bazės. Jei vietoje skelbiamos kelios kainos, rodoma mažiausia, todėl tikroji kaina gali būti didesnė, priklausomai nuo įkroviklio, mokėjimo būdo ar narystės. Kainos yra orientacinės.</p>
       <p>Duomenų bazėje yra ir viešos, ir pusiau viešos (pvz., biurų ar gyvenamųjų namų aikštelių) prieigos, todėl kai kurios labai pigios ar nemokamos vietos gali būti prieinamos ne visiems.</p>
-      <p><b>Privatumas:</b> jūsų buvimo vieta naudojama tik jūsų įrenginyje ir niekur nesiunčiama ar nesaugoma.</p>
+      <p><b>Privatumas:</b> jūsų buvimo vieta naudojama tik jūsų įrenginyje ir niekur nesiunčiama. Namų vieta ir automobilio nustatymai saugomi tik šiame įrenginyje.</p><p><b>Kaip skaičiuojama:</b> lyginama visa kaina – įkrovimas plius kelionė pirmyn ir atgal (elektra, automobilio dėvėjimasis ir jūsų laikas). Atstumas vertinamas apytiksliai (tiesi linija × 1,3).</p>
       <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
   },
   en: {
+    fromLbl: "From:",
+    originMe: "📍 My location",
+    originHome: "🏠 Home",
+    originMeShort: "your location",
+    originHomeShort: "home",
+    resultsFrom: (label, kwh) => `Cheapest in total (${kwh} kWh + trip) from ${label}`,
+    away: k => `~${k} km away`,
+    breakdown: (c, t) => `charging ${c} + trip ${t}`,
+    vsNearest: a => `${a} cheaper than the nearest`,
+    isNearest: "Nearest",
+    tripNote: (wear, time, cons) => `Trip cost = electricity to drive there and back (${cons} kWh/100 km), car wear (${wear}/km) and your time (${time}/h). Change these in 🚗 ⚙️.`,
+    freeNearby: n => `There are also ${n} free spots nearby (blue on the map), but these are often only for customers or residents.`,
+    detailTrip: (label, k, trip, total) => `From ${label}: ~${k} km there and back · trip ${trip} · total ${total}`,
+    needHome: "Set your home location first.",
+    homeTitle: "🏠 Home location",
+    homeUseLoc: "Use my location",
+    homeUseCentre: "Use map centre",
+    homeClear: "Remove home",
+    homeSet: town => `Set: ${town}. Saved on this device only.`,
+    homeNotSet: "Not set yet. It will be saved on this device only.",
+    homeSaved: "Home saved",
+    carTitle: "🚗 Your car",
+    carHint: "Used to work out whether a cheaper charger is worth the drive.",
+    consLbl: "Consumption",
+    wearLbl: "Wear & upkeep",
+    timeLbl: "Value of your time",
+    saveBtn: "Save",
     appName: "Charging prices",
     bestCharge: "⚡ Best Charge",
     nearMe: "📍 Near me",
@@ -95,7 +149,7 @@ const I18N = {
       <p>This is an early version of an app that helps you find the cheapest place to charge your electric car in Lithuania.</p>
       <p><b>Prices</b> are the operators' own published tariffs from Lithuania's national charging database. Where a location lists several prices, the lowest is shown, so the real price can be higher depending on the charger, payment method or membership. Treat prices as estimates.</p>
       <p>The database covers both public and semi-public chargers (for example in office or residential car parks), so some very cheap or free spots may only be open to certain users.</p>
-      <p><b>Privacy:</b> your location is only used on your device. It is never sent anywhere or stored.</p>
+      <p><b>Privacy:</b> your location is only used on your device and is never sent anywhere. Your home location and car settings are saved on this device only.</p><p><b>How it ranks:</b> by total cost, meaning the charge plus the trip there and back (electricity, car wear and your time). Distances are estimated (straight line × 1.3).</p>
       <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
   }
 };

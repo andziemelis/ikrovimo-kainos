@@ -74,3 +74,13 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 
 .toast{position:fixed;left:50%;top:calc(110px + var(--safe-t));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 14px;border-radius:12px;font-size:13px;z-index:30;max-width:90vw}
 .maplibregl-ctrl-bottom-right{bottom:auto;top:calc(110px + var(--safe-t))}
+
+/* settings sheet */
+.btnrow{display:flex;gap:8px}
+.btnrow .secondary{flex:1;padding:12px;font-size:13px}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px;cursor:pointer;align-self:flex-start;padding:2px 0}
+.field{display:grid;grid-template-columns:1fr 84px 86px;align-items:center;gap:8px;font-size:14px}
+.field input{border:1px solid var(--line);border-radius:10px;padding:9px;font-size:15px;font-family:inherit;width:100%}
+.field em{font-style:normal;font-size:12px;color:var(--muted)}
+.breakdown{font-size:12px;color:var(--muted)}
+.origin-pin{width:22px;height:22px;border-radius:50%;background:#1d4ed8;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35);display:grid;place-items:center;font-size:11px}

@@ -1,10 +1,11 @@
 "use strict";
 // ---------- config ----------
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const DATA_URL = "data/lt.json";
-const RADIUS_KM = 8;            // search radius for Best Charge
-const DETOUR_EUR_PER_KM = 0.004; // convenience: each km of detour counts as +€0.004/kWh
-const KM_PER_KWH = 6.5;
+const SEARCH_KM = 25;          // look this far (straight line); the cost model decides what is worth it
+const ROAD_FACTOR = 1.3;       // roads are ~30% longer than a straight line
+const CAR_DEFAULTS = { cons: 17, wear: 0.05, timeVal: 6 }; // kWh/100 km, €/km (tyres, servicing, depreciation), €/h
+const speedFor = km => km < 10 ? 30 : 55; // km/h: town driving vs. out-of-town
 const CITIES = [
   { id: "vilnius", en: "Vilnius", lt: "Vilniaus", c: [54.687, 25.280] },
   { id: "kaunas", en: "Kaunas", lt: "Kauno", c: [54.898, 23.904] },
@@ -38,7 +39,9 @@ const levelOf = p => p == null ? T().unknown : p === 0 ? T().free : p <= 0.29 ? 
 function toast(msg, ms = 3500) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, ms); }
 
 // ---------- state ----------
-let L = [], DATA = null, selected = null, userPos = null;
+let L = [], DATA = null, selected = null, userPos = null, lastOrigin = null;
+let homeLoc = store.get("home", null);              // [lat, lon] or null
+let car = { ...CAR_DEFAULTS, ...store.get("car", {}) };
 let fastOnly = store.get("fastOnly", false), hideUnknown = store.get("hideUnknown", false);
 const isFast = l => l.kw > 22;
 function offerPrice(o, l, fast) { if (fast) { if (o.dc != null) return o.dc; return l.kw > 22 ? o.m : null; } return o.m; }
@@ -49,11 +52,19 @@ function priceOf(l, fast = fastOnly) {
 }
 
 // ---------- map ----------
+const LITHUANIA = { center: [23.9, 55.2], zoom: 6.3, pitch: 0, bearing: 0 };
+const firstVisit = !store.get("seenGlobe", false);
 const map = new maplibregl.Map({
-  container: "map", style: MAP_STYLE, center: [23.9, 55.2], zoom: 6.3, minZoom: 5,
-  attributionControl: { compact: true },
+  container: "map", style: MAP_STYLE, attributionControl: { compact: true },
+  // first visit starts from space and flies in; later visits open straight on Lithuania
+  ...(firstVisit ? { center: [23.9, 50], zoom: 1.6 } : LITHUANIA),
+  maxPitch: 75, dragRotate: true, touchPitch: true, pitchWithRotate: true,
 });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
+map.on("style.load", () => {
+  try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
+  try { map.setSky({ "sky-color": "#a9d4ff", "horizon-color": "#e6f2ff", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
+});
 
 function geojson() {
   const features = [];
@@ -84,7 +95,7 @@ function addLayers() {
       "text-offset": [0, 1.3], "text-anchor": "top", "text-allow-overlap": false },
     paint: { "text-color": "#0f172a", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": "#2563eb", "circle-radius": 8, "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#7c3aed", "#2563eb"], "circle-radius": 9, "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
   map.on("click", "chargers", e => select(e.features[0].properties.i, false));
   map.on("mouseenter", "chargers", () => map.getCanvas().style.cursor = "pointer");
   map.on("mouseleave", "chargers", () => map.getCanvas().style.cursor = "");
@@ -98,7 +109,11 @@ function select(i, fly = true) {
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
   const priced = l.offers.filter(x => x.m != null).length;
-  const total = p == null ? t.noPriceLong : p === 0 ? t.freeToCharge : t.forKwh(money(p * kwh), kwh, Math.round(kwh * KM_PER_KWH));
+  let total = p == null ? t.noPriceLong : p === 0 ? t.freeToCharge : t.forKwh(money(p * kwh), kwh, Math.round(kwh / car.cons * 100));
+  if (p != null && p > 0 && lastOrigin) {
+    const c = tripCost(km(lastOrigin.pos[0], lastOrigin.pos[1], l.la, l.lo), p, kwh);
+    total += `<div class="breakdown">${t.detailTrip(lastOrigin.label, Math.round(c.road * 10) / 10, money(c.trip), money(c.total))}</div>`;
+  }
   const offers = l.offers.map(x => {
     const sub = [x.ac != null && t.slowFrom(money(x.ac)), x.dc != null && t.fastFrom(money(x.dc))].filter(Boolean).join(" · ");
     const head = x.m == null ? t.noPrice : x.f ? t.free : `${t.from} ${kwhPrice(x.m)}`;
@@ -146,57 +161,112 @@ for (const id of ["navGoogle", "navWaze", "navApple"]) $(id).addEventListener("c
 $("navCancel").onclick = () => $("navModal").hidden = true;
 $("navModal").addEventListener("click", e => { if (e.target.id === "navModal") $("navModal").hidden = true; });
 
+// ---------- cost model ----------
+// Total cost of charging at a location = the charge itself + the trip there and back:
+// electricity used for the detour, car wear (tyres, servicing, depreciation) and your time.
+function tripCost(straightKm, price, kwh) {
+  const oneWay = straightKm * ROAD_FACTOR, road = oneWay * 2;
+  const driveKwh = road * car.cons / 100;
+  const trip = price * driveKwh + road * car.wear + road / speedFor(oneWay) * car.timeVal;
+  return { road, oneWay, charge: price * kwh, trip, total: price * kwh + trip };
+}
+
+// ---------- where the driver starts from ----------
+function setOriginMarker(pos, kind) {
+  map.getSource("me")?.setData(pos ? { type: "Feature", geometry: { type: "Point", coordinates: [pos[1], pos[0]] }, properties: { kind } }
+    : { type: "FeatureCollection", features: [] });
+}
+function getMyLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { toast(T().locFailed); resolve(null); return; }
+    toast(T().locating, 8000);
+    navigator.geolocation.getCurrentPosition(pos => {
+      $("toast").hidden = true; userPos = [pos.coords.latitude, pos.coords.longitude]; resolve(userPos);
+    }, () => { toast(T().locFailed); resolve(null); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+  });
+}
+async function getOrigin() {
+  const v = $("origin").value, t = T();
+  if (v === "me") { const p = userPos || await getMyLocation(); return p && { pos: p, label: t.originMeShort, kind: "me" }; }
+  if (v === "home") {
+    if (!homeLoc) { toast(t.needHome); openCar(); return null; }
+    return { pos: homeLoc, label: t.originHomeShort, kind: "home" };
+  }
+  const c = CITIES.find(x => x.id === v);
+  return { pos: c.c, label: c.en, kind: "city" };
+}
+
 // ---------- Best Charge ----------
-function bestCharge() {
+async function bestCharge() {
   const t = T(), kwh = +$("kwh").value;
-  const city = CITIES.find(c => c.id === $("city").value);
-  const origin = userPos || city.c;
-  const where = userPos ? t.nearYou : t.nearCity(lang === "lt" ? city.lt : city.en);
-  const pool = L.filter(l => !fastOnly || isFast(l)).map(l => ({ l, d: km(origin[0], origin[1], l.la, l.lo), ...priceOf(l) }))
-    .filter(x => x.d <= RADIUS_KM && x.p != null);
+  const origin = await getOrigin();
+  if (!origin) return;
+  lastOrigin = origin;
+  setOriginMarker(origin.pos, origin.kind);
+  const [oLa, oLo] = origin.pos;
+  const pool = L.filter(l => !fastOnly || isFast(l)).map(l => ({ l, d: km(oLa, oLo, l.la, l.lo), ...priceOf(l) }))
+    .filter(x => x.d <= SEARCH_KM && x.p != null);
   // free spots are usually for customers or residents only, so they're mentioned but not recommended
-  const freeN = pool.filter(x => x.p === 0).length, paid = pool.filter(x => x.p > 0);
-  if (!paid.length) { $("results").innerHTML = `<div class="note">${t.noneNear(RADIUS_KM)}</div>`; return; }
-  const avg = paid.reduce((a, x) => a + x.p, 0) / paid.length;
-  paid.sort((a, b) => (a.p + a.d * DETOUR_EUR_PER_KM) - (b.p + b.d * DETOUR_EUR_PER_KM));
+  const freeN = pool.filter(x => x.p === 0 && x.d <= 8).length;
+  const paid = pool.filter(x => x.p > 0).map(x => ({ ...x, c: tripCost(x.d, x.p, kwh) }));
+  if (!paid.length) { $("results").innerHTML = `<div class="note">${t.noneNear(SEARCH_KM)}</div>`; return; }
+  const nearest = paid.reduce((a, b) => b.d < a.d ? b : a);   // what most people would do without the app
+  paid.sort((a, b) => a.c.total - b.c.total);
   const top = [];
   for (const x of paid) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
-  $("results").innerHTML = `<div class="res-head">${t.resultsNear(where)}</div>` + top.map(x => {
-    const saving = (avg - x.p) * kwh;
+  $("results").innerHTML = `<div class="res-head">${t.resultsFrom(origin.label, kwh)}</div>` + top.map(x => {
+    const saving = nearest.c.total - x.c.total;
+    const badge = x === nearest ? `<span class="save">${t.isNearest}</span>` : saving > 0.2 ? `<span class="save">${t.vsNearest(money(saving))}</span>` : "";
     return `<div class="pick" data-i="${x.l.i}">
-      <div class="amt" style="color:${colourOf(x.p)}">${money(x.p * kwh)}</div>
-      <div class="meta"><b>${x.o.op}</b> · ${townOf(x.l)} · ${x.d.toFixed(1)} km<br>${kwhPrice(x.p)} · ${t.upTo} ${x.l.kw} kW${x.o.pk || x.o.fx ? " · " + t.extraFees : ""}
-        ${saving > 0.25 ? `<br><span class="save">${t.save(money(saving))}</span>` : ""}</div>
+      <div class="amt" style="color:${colourOf(x.p)}">${money(x.c.total)}</div>
+      <div class="meta"><b>${x.o.op}</b> · ${townOf(x.l)} · ${t.away(x.c.oneWay.toFixed(1))}<br>
+        <span class="breakdown">${t.breakdown(money(x.c.charge), money(x.c.trip))} · ${kwhPrice(x.p)}${x.o.pk || x.o.fx ? " · " + t.extraFees : ""}</span>
+        ${badge ? "<br>" + badge : ""}</div>
       <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}">🧭</button>
     </div>`;
-  }).join("") + `<div class="note">${t.avgNote(money(avg), paid.length, RADIUS_KM, freeN)}</div>`;
+  }).join("") + `<div class="note">${t.tripNote(money(car.wear), money(car.timeVal), car.cons)}${freeN ? " " + t.freeNearby(freeN) : ""}</div>`;
   $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
     const nav = e.target.closest("[data-nav]");
     if (nav) { e.stopPropagation(); navigate(L[+nav.dataset.nav]); } else select(+el.dataset.i);
   }));
-  const b = new maplibregl.LngLatBounds([origin[1], origin[0]], [origin[1], origin[0]]);
+  const b = new maplibregl.LngLatBounds([oLo, oLa], [oLo, oLa]);
   top.forEach(x => b.extend([x.l.lo, x.l.la]));
-  map.fitBounds(b, { padding: { top: 140, bottom: window.innerWidth < 760 ? window.innerHeight * 0.55 : 60, left: window.innerWidth < 760 ? 40 : 440, right: 40 }, maxZoom: 14 });
+  map.fitBounds(b, { padding: { top: 140, bottom: window.innerWidth < 760 ? window.innerHeight * 0.55 : 60, left: window.innerWidth < 760 ? 40 : 440, right: 40 }, maxZoom: 14, pitch: 35 });
 }
 
-function locate() {
-  if (!navigator.geolocation) { toast(T().locFailed); return; }
-  toast(T().locating, 8000);
-  navigator.geolocation.getCurrentPosition(pos => {
-    $("toast").hidden = true;
-    userPos = [pos.coords.latitude, pos.coords.longitude];
-    map.getSource("me")?.setData({ type: "Feature", geometry: { type: "Point", coordinates: [userPos[1], userPos[0]] }, properties: {} });
-    bestCharge();
-  }, () => toast(T().locFailed), { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+// ---------- home & car settings ----------
+function openCar() {
+  const t = T();
+  $("homeStatus").textContent = homeLoc ? t.homeSet(townOf({ la: homeLoc[0], lo: homeLoc[1] })) : t.homeNotSet;
+  $("homeClear").hidden = !homeLoc;
+  $("cons").value = car.cons; $("wear").value = car.wear; $("timeVal").value = car.timeVal;
+  $("carModal").hidden = false;
 }
+function setHome(pos) {
+  homeLoc = [+pos[0].toFixed(5), +pos[1].toFixed(5)]; store.set("home", homeLoc);
+  $("origin").value = "home"; store.set("origin", "home");
+  setOriginMarker(homeLoc, "home"); openCar(); toast(T().homeSaved);
+}
+$("carBtn").onclick = openCar;
+$("homeHere").onclick = async () => { const p = await getMyLocation(); if (p) setHome(p); };
+$("homeCentre").onclick = () => { const c = map.getCenter(); setHome([c.lat, c.lng]); };
+$("homeClear").onclick = () => { homeLoc = null; store.set("home", null); if ($("origin").value === "home") $("origin").value = "me"; setOriginMarker(null); openCar(); };
+$("carSave").onclick = () => {
+  const num = (id, d, lo, hi) => { const v = parseFloat(String($(id).value).replace(",", ".")); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+  car = { cons: num("cons", CAR_DEFAULTS.cons, 8, 40), wear: num("wear", CAR_DEFAULTS.wear, 0, 1), timeVal: num("timeVal", CAR_DEFAULTS.timeVal, 0, 200) };
+  store.set("car", car); $("carModal").hidden = true;
+  if ($("results").innerHTML) bestCharge();
+};
+$("carModal").addEventListener("click", e => { if (e.target.id === "carModal") $("carModal").hidden = true; });
 
 // ---------- UI wiring ----------
 function applyLang() {
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = T()[el.dataset.t]);
   $("langBtn").textContent = lang === "lt" ? "EN" : "LT";
-  $("city").innerHTML = CITIES.map(c => `<option value="${c.id}">${T().cityPrefix} ${lang === "lt" ? c.lt : c.en}</option>`).join("");
-  $("city").value = store.get("city", "vilnius");
+  $("origin").innerHTML = `<option value="me">${T().originMe}</option><option value="home">${T().originHome}</option>` +
+    CITIES.map(c => `<option value="${c.id}">${c.en}</option>`).join("");
+  $("origin").value = store.get("origin", homeLoc ? "home" : "me");
   $("infoBody").innerHTML = T().about + `<button class="secondary" id="infoClose">${T().close}</button>`;
   $("infoClose").onclick = () => $("infoModal").hidden = true;
   setUpdated();
@@ -214,8 +284,7 @@ $("infoModal").addEventListener("click", e => { if (e.target.id === "infoModal")
 $("fastChip").onclick = () => { fastOnly = !fastOnly; store.set("fastOnly", fastOnly); setChips(); refreshMap(); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = bestCharge;
-$("nearBtn").onclick = locate;
-$("city").onchange = () => { userPos = null; map.getSource("me")?.setData({ type: "FeatureCollection", features: [] }); store.set("city", $("city").value); if ($("results").innerHTML) bestCharge(); };
+$("origin").onchange = () => { store.set("origin", $("origin").value); bestCharge(); };
 $("kwh").onchange = () => { if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
@@ -227,4 +296,7 @@ const dataReady = fetch(DATA_URL, { cache: "no-cache" }).then(r => { if (!r.ok) 
     offers: offers.map(([op, m, ac, dc, fl, tt]) => ({ op: d.ops[op], m: (fl & 1) ? 0 : m, ac, dc, f: fl & 1, fo: fl & 2, pk: fl & 4, fx: fl & 8, t: tt.map(j => d.T[j]) })) }));
   setUpdated();
 }).catch(() => toast(T().loadFail, 8000));
-map.on("load", () => dataReady.then(addLayers));
+map.on("load", () => {
+  dataReady.then(addLayers);
+  if (firstVisit) { store.set("seenGlobe", true); setTimeout(() => map.flyTo({ ...LITHUANIA, duration: 4500, essential: true }), 600); }
+});

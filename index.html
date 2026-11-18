@@ -35,16 +35,17 @@
   <div id="home">
     <div class="actions">
       <button class="go" id="bestBtn" data-t="bestCharge"></button>
-      <button class="secondary" id="nearBtn" data-t="nearMe"></button>
+      <button class="secondary" id="carBtn" aria-label="Settings">🚗 ⚙️</button>
     </div>
     <div class="row">
+      <label class="lbl" for="origin" data-t="fromLbl"></label>
+      <select id="origin"></select>
       <label class="lbl" for="kwh" data-t="howMuch"></label>
       <select id="kwh">
         <option value="20">20 kWh</option>
-        <option value="40" selected>40 kWh (~10→70%)</option>
+        <option value="40" selected>40 kWh</option>
         <option value="60">60 kWh</option>
       </select>
-      <select id="city" aria-label="City"></select>
     </div>
     <div id="results"></div>
     <div class="legend">
@@ -66,6 +67,24 @@
     <a class="navopt" id="navWaze" target="_blank" rel="noopener">Waze</a>
     <a class="navopt" id="navApple" target="_blank" rel="noopener">Apple Maps</a>
     <button class="secondary" id="navCancel" data-t="cancel"></button>
+  </div>
+</div>
+
+<div class="modal" id="carModal" hidden>
+  <div class="sheet">
+    <h3 data-t="homeTitle"></h3>
+    <div class="note" id="homeStatus"></div>
+    <div class="btnrow">
+      <button class="secondary" id="homeHere" data-t="homeUseLoc"></button>
+      <button class="secondary" id="homeCentre" data-t="homeUseCentre"></button>
+    </div>
+    <button class="linkbtn" id="homeClear" data-t="homeClear"></button>
+    <h3 data-t="carTitle" style="margin-top:12px"></h3>
+    <div class="note" data-t="carHint"></div>
+    <label class="field"><span data-t="consLbl"></span><input type="number" id="cons" min="10" max="35" step="0.5" inputmode="decimal"><em>kWh/100 km</em></label>
+    <label class="field"><span data-t="wearLbl"></span><input type="number" id="wear" min="0" max="0.5" step="0.01" inputmode="decimal"><em>€/km</em></label>
+    <label class="field"><span data-t="timeLbl"></span><input type="number" id="timeVal" min="0" max="100" step="1" inputmode="decimal"><em>€/h</em></label>
+    <button class="go" id="carSave" data-t="saveBtn"></button>
   </div>
 </div>
 
