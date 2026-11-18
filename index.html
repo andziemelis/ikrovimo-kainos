@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Įkrovimo kainos – EV charging prices in Lithuania</title>
+<meta name="description" content="Compare electric car charging prices across Lithuania and find the cheapest charger near you.">
+<meta name="theme-color" content="#0f7a3d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+
+<header class="top">
+  <div class="brand"><span class="logo">⚡</span><span data-t="appName"></span></div>
+  <div class="top-actions">
+    <button class="pill-btn" id="langBtn" aria-label="Language">EN</button>
+    <button class="pill-btn" id="infoBtn" aria-label="About">i</button>
+  </div>
+</header>
+
+<div class="filters">
+  <button class="chip" id="fastChip" data-t="fastOnly"></button>
+  <button class="chip" id="unkChip" data-t="hideUnknown"></button>
+</div>
+
+<section class="panel" id="panel">
+  <div class="grab"></div>
+  <div id="home">
+    <div class="actions">
+      <button class="go" id="bestBtn" data-t="bestCharge"></button>
+      <button class="secondary" id="nearBtn" data-t="nearMe"></button>
+    </div>
+    <div class="row">
+      <label class="lbl" for="kwh" data-t="howMuch"></label>
+      <select id="kwh">
+        <option value="20">20 kWh</option>
+        <option value="40" selected>40 kWh (~10→70%)</option>
+        <option value="60">60 kWh</option>
+      </select>
+      <select id="city" aria-label="City"></select>
+    </div>
+    <div id="results"></div>
+    <div class="legend">
+      <span><i class="c-free"></i><span data-t="free"></span></span>
+      <span><i class="c-cheap"></i>≤ 0.29</span>
+      <span><i class="c-mid"></i>0.30–0.37</span>
+      <span><i class="c-high"></i>≥ 0.38 €/kWh</span>
+      <span><i class="c-unk"></i><span data-t="noPrice"></span></span>
+    </div>
+    <div class="updated" id="updated"></div>
+  </div>
+  <div id="detail" hidden></div>
+</section>
+
+<div class="modal" id="navModal" hidden>
+  <div class="sheet">
+    <h3 data-t="navigateWith"></h3>
+    <a class="navopt" id="navGoogle" target="_blank" rel="noopener">Google Maps</a>
+    <a class="navopt" id="navWaze" target="_blank" rel="noopener">Waze</a>
+    <a class="navopt" id="navApple" target="_blank" rel="noopener">Apple Maps</a>
+    <button class="secondary" id="navCancel" data-t="cancel"></button>
+  </div>
+</div>
+
+<div class="modal" id="infoModal" hidden>
+  <div class="sheet info" id="infoBody"></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

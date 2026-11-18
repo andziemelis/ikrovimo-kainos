@@ -1,0 +1,101 @@
+// UI text in Lithuanian and English. Numbers and prices are formatted in app.js.
+const I18N = {
+  lt: {
+    appName: "Įkrovimo kainos",
+    bestCharge: "⚡ Pigiausias įkrovimas",
+    nearMe: "📍 Šalia manęs",
+    howMuch: "Kiek krauti:",
+    fastOnly: "Tik greitieji (DC)",
+    hideUnknown: "Slėpti be kainos",
+    free: "Nemokama",
+    noPrice: "Kaina neskelbiama",
+    navigateWith: "Naviguoti su",
+    navigate: "Vykti",
+    cancel: "Atšaukti",
+    close: "Uždaryti",
+    from: "nuo",
+    upTo: "iki",
+    points: n => `${n} įkrovimo ${n % 10 === 1 && n % 100 !== 11 ? "taškas" : n % 10 >= 2 && (n % 100 < 10 || n % 100 > 20) ? "taškai" : "taškų"}`,
+    forKwh: (amt, kwh, km) => `<b>≈ ${amt}</b> už ${kwh} kWh · apie ${km} km kelio`,
+    freeToCharge: "Įkrauti nemokama",
+    noPriceLong: "Šios vietos kaina atviruose duomenyse dar neskelbiama",
+    cheap: "Pigu", average: "Vidutiniškai", expensive: "Brangu", unknown: "Nežinoma",
+    cheapestVia: op => `pigiausia per <b>${op}</b>`,
+    slowFrom: p => `lėtas (AC) nuo ${p}`,
+    fastFrom: p => `greitas (DC) nuo ${p}`,
+    manyCompanies: (n, priced) => priced > 1
+      ? `${n} įmonės skelbia šią vietą su skirtingomis kainomis – tinkama programėlė čia pati savaime sutaupo.`
+      : `${n} įmonės skelbia šią vietą, bet kainą skelbia tik ${priced}.`,
+    parkingWarn: "⚠️ Viename tarife yra 6 €/val. parkavimo mokestis. Sąlygas rasite operatoriaus taisyklėse – pasitikrinkite prieš ilgiau stovėdami.",
+    fixedWarn: "⚠️ Kai kurie tarifai prie €/kWh kainos prideda fiksuotą mokestį, kuris į sąmatą neįtrauktas.",
+    freeOptInfo: "ℹ️ Čia nurodytas ir nemokamas tarifas, bet jo sąlygos neaiškios, todėl jis neskaičiuojamas kaip nemokamas.",
+    resultsNear: where => `Geriausi pasirinkimai ${where}`,
+    nearYou: "šalia jūsų",
+    nearCity: c => `šalia ${c}`,
+    save: amt => `Sutaupote ${amt}, palyginti su vietos vidurkiu`,
+    extraFees: "gali būti papildomų mokesčių",
+    avgNote: (avg, n, r, freeN) => `Vidutinė mažiausia kaina ${r} km spinduliu: ${avg}/kWh (${n} vietos su kainomis).` +
+      (freeN ? ` Netoliese yra ir ${freeN} nemokamos vietos (mėlynos žemėlapyje), bet jos dažnai skirtos tik klientams ar gyventojams.` : ""),
+    noneNear: r => `${r} km spinduliu nėra vietų su paskelbtomis kainomis.`,
+    locating: "Nustatoma jūsų vieta…",
+    locFailed: "Nepavyko nustatyti vietos. Pasirinkite miestą sąraše.",
+    updated: d => `Kainos atnaujintos ${d} · Duomenys: Via Lietuva`,
+    loadFail: "Nepavyko įkelti įkrovimo duomenų. Pabandykite vėliau.",
+    cityPrefix: "šalia",
+    about: `<h3>Apie</h3>
+      <p>Tai ankstyva programėlės versija, padedanti rasti pigiausią elektromobilio įkrovimą Lietuvoje.</p>
+      <p><b>Kainos</b> – tai operatorių paskelbti tarifai iš Lietuvos nacionalinės įkrovimo prieigų duomenų bazės. Jei vietoje skelbiamos kelios kainos, rodoma mažiausia, todėl tikroji kaina gali būti didesnė, priklausomai nuo įkroviklio, mokėjimo būdo ar narystės. Kainos yra orientacinės.</p>
+      <p>Duomenų bazėje yra ir viešos, ir pusiau viešos (pvz., biurų ar gyvenamųjų namų aikštelių) prieigos, todėl kai kurios labai pigios ar nemokamos vietos gali būti prieinamos ne visiems.</p>
+      <p><b>Privatumas:</b> jūsų buvimo vieta naudojama tik jūsų įrenginyje ir niekur nesiunčiama ar nesaugoma.</p>
+      <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
+  },
+  en: {
+    appName: "Charging prices",
+    bestCharge: "⚡ Best Charge",
+    nearMe: "📍 Near me",
+    howMuch: "Charge:",
+    fastOnly: "Fast only (DC)",
+    hideUnknown: "Hide unknown prices",
+    free: "Free",
+    noPrice: "No price",
+    navigateWith: "Navigate with",
+    navigate: "Navigate",
+    cancel: "Cancel",
+    close: "Close",
+    from: "from",
+    upTo: "up to",
+    points: n => n === 1 ? "1 charging point" : `${n} charging points`,
+    forKwh: (amt, kwh, km) => `<b>≈ ${amt}</b> for ${kwh} kWh · about ${km} km of driving`,
+    freeToCharge: "Free to charge",
+    noPriceLong: "No price published in the open data for this location yet",
+    cheap: "Cheap", average: "Average", expensive: "Expensive", unknown: "Unknown",
+    cheapestVia: op => `cheapest via <b>${op}</b>`,
+    slowFrom: p => `slow (AC) from ${p}`,
+    fastFrom: p => `fast (DC) from ${p}`,
+    manyCompanies: (n, priced) => priced > 1
+      ? `${n} companies list this location with different prices, so picking the right app here saves money on its own.`
+      : `${n} companies list this location, but only ${priced} publish a price.`,
+    parkingWarn: "⚠️ One tariff here includes a €6/h parking fee. The conditions are in the operator's terms, so check before staying long.",
+    fixedWarn: "⚠️ Some tariffs add a fixed fee on top of the €/kWh price, which isn't included in the estimate.",
+    freeOptInfo: "ℹ️ A free tariff is also listed here, but its conditions aren't stated, so it isn't counted as free.",
+    resultsNear: where => `Best options ${where}`,
+    nearYou: "near you",
+    nearCity: c => `near ${c}`,
+    save: amt => `Save ${amt} vs local average`,
+    extraFees: "extra fees may apply",
+    avgNote: (avg, n, r, freeN) => `Average lowest price within ${r} km: ${avg}/kWh (${n} locations with prices).` +
+      (freeN ? ` There are also ${freeN} free spots nearby (blue on the map), but these are often only for customers or residents.` : ""),
+    noneNear: r => `No locations with published prices within ${r} km.`,
+    locating: "Finding your location…",
+    locFailed: "Couldn't get your location. Pick a city from the list instead.",
+    updated: d => `Prices updated ${d} · Data: Via Lietuva`,
+    loadFail: "Couldn't load the charging data. Please try again later.",
+    cityPrefix: "near",
+    about: `<h3>About</h3>
+      <p>This is an early version of an app that helps you find the cheapest place to charge your electric car in Lithuania.</p>
+      <p><b>Prices</b> are the operators' own published tariffs from Lithuania's national charging database. Where a location lists several prices, the lowest is shown, so the real price can be higher depending on the charger, payment method or membership. Treat prices as estimates.</p>
+      <p>The database covers both public and semi-public chargers (for example in office or residential car parks), so some very cheap or free spots may only be open to certain users.</p>
+      <p><b>Privacy:</b> your location is only used on your device. It is never sent anywhere or stored.</p>
+      <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
+  }
+};

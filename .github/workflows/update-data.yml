@@ -1,0 +1,42 @@
+name: Update charging data
+
+# Downloads Via Lietuva's open charging data every 30 minutes and
+# commits data/lt.json when prices or stations have changed.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build data/lt.json
+        run: python scripts/build_data.py
+
+      - name: Commit if changed
+        run: |
+          # publication time changes on every download, so compare everything except it
+          if git diff --quiet -- data/lt.json; then echo "No change"; exit 0; fi
+          if ! python scripts/data_changed.py; then
+            echo "Only the timestamp changed"; git checkout -- data/lt.json; exit 0
+          fi
+          git config user.name "data-bot"
+          git config user.email "data-bot@users.noreply.github.com"
+          git add data/lt.json
+          git commit -m "Update charging data"
+          git push
