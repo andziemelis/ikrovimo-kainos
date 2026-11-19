@@ -250,7 +250,7 @@ function select(i, fly = true) {
   $("dClose").onclick = closeDetail;
   if (fly) cinematicTo(l);
 }
-function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; }
+function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; $("home").classList.remove("enter"); void $("home").offsetWidth; $("home").classList.add("enter"); }
 
 // ---------- navigation hand-off ----------
 function navigate(l) {
@@ -326,13 +326,14 @@ async function bestCharge() {
   $("results").innerHTML = `<div class="res-head">${t.resultsHead}</div>` + top.map((x, n) => {
     const saving = nearest.c.total - x.c.total;
     const extra = x === nearest ? t.isNearest : saving > 0.2 ? t.saves(money(saving)) : "";
-    return `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}">
-      <div class="amt">${money(x.c.total)}</div>
+    return `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}" style="animation-delay:${n * 80}ms">
+      <div class="amt" data-v="${x.c.total}">${money(x.c.total)}</div>
       <div class="meta"><b>${x.o.op}</b><span>${x.c.oneWay.toFixed(1)} km${extra ? ` · <em>${extra}</em>` : ""}</span></div>
       <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
     </div>`;
   }).join("");
   document.querySelector(".legend").hidden = true;
+  countUp($("results").querySelectorAll(".amt[data-v]"));
   $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
     const nav = e.target.closest("[data-nav]");
     if (nav) { e.stopPropagation(); navigate(L[+nav.dataset.nav]); } else select(+el.dataset.i);
@@ -391,7 +392,7 @@ let linkAnim = 0;
 function drawLinks(originPos, targets) {
   const src = map.getSource("links"); if (!src) return;
   const from = [originPos[1], originPos[0]];
-  const lines = targets.map(x => ({ pts: arc(from, [x.l.lo, x.l.la]), c: x.best ? "#4ade80" : "#38bdf8", best: x.best ? 1 : 0 }));
+  const lines = targets.map(x => ({ pts: arc(from, [x.l.lo, x.l.la]), c: x.best ? "#a78bfa" : "#6366f1", best: x.best ? 1 : 0 }));
   const frame = p => src.setData({ type: "FeatureCollection", features: lines.map(L1 => ({ type: "Feature",
     properties: { c: L1.c, best: L1.best },
     geometry: { type: "LineString", coordinates: L1.pts.slice(0, Math.max(2, Math.ceil(p * L1.pts.length))) } })) });
@@ -417,6 +418,18 @@ function flyIntoLithuania() {
   stopSpin();
   if (map.getZoom() > 4) return;
   if (REDUCED_MOTION) map.jumpTo(LITHUANIA); else map.flyTo({ ...LITHUANIA, duration: 4500, essential: true });
+}
+
+// Totals roll up to their value, like an amount in a payment app.
+function countUp(els) {
+  if (REDUCED_MOTION) return;
+  const t0 = performance.now(), dur = 700;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur), e = 1 - (1 - p) ** 3;
+    els.forEach(el => { el.textContent = money(+el.dataset.v * e); });
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // ---------- floating stats card ----------
