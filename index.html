@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611191127">
+<link rel="stylesheet" href="style.css?v=202611191259">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
@@ -33,7 +33,7 @@
 </div>
 
 <div class="filters">
-  <button class="chip" id="fastChip" data-t="fastOnly"></button>
+  <div class="seg" id="fastSeg" role="radiogroup" aria-label="Chargers"></div>
   <button class="chip" id="unkChip" data-t="hideUnknown"></button>
 </div>
 
@@ -47,8 +47,11 @@
     <div class="row">
       <label class="lbl" for="origin" data-t="fromLbl"></label>
       <select id="origin"></select>
-      <label class="lbl" for="kwh" data-t="howMuch"></label>
-      <select id="kwh">
+    </div>
+    <div class="row">
+      <label class="lbl" data-t="howMuch"></label>
+      <div class="seg grow" id="kwhSeg" role="radiogroup" aria-label="kWh"></div>
+      <select id="kwh" class="sr-only" tabindex="-1" aria-hidden="true">
         <option value="20">20 kWh</option>
         <option value="40" selected>40 kWh</option>
         <option value="60">60 kWh</option>
@@ -131,7 +134,7 @@
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="i18n.js?v=202611191127"></script>
-<script src="app.js?v=202611191127"></script>
+<script src="i18n.js?v=202611191259"></script>
+<script src="app.js?v=202611191259"></script>
 </body>
 </html>

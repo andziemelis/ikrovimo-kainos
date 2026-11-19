@@ -515,6 +515,57 @@ if (!REDUCED_MOTION) document.addEventListener("pointermove", e => {
   el.style.setProperty("--gy", `${((e.clientY - r.top) / r.height) * 100}%`);
 }, { passive: true });
 
+// ---------- liquid glass segmented control (like the iOS tab bar) ----------
+// A clear glass lens sits on the chosen option. Switching makes it pop out, stretch while it slides
+// on a spring, magnify what is under it, then settle. You can also drag the lens across the options.
+function liquidSeg(host, options, value, onChange) {
+  host.innerHTML = '<span class="lens" aria-hidden="true"></span>' +
+    options.map(o => `<button type="button" role="radio" data-v="${o.value}" title="${o.title || ""}">${o.label}</button>`).join("");
+  const lens = host.querySelector(".lens"), btns = [...host.querySelectorAll("button")];
+  const place = (btn, animate) => {
+    const r = btn.getBoundingClientRect(), hr = host.getBoundingClientRect();
+    lens.style.left = `${r.left - hr.left}px`; lens.style.width = `${r.width}px`;
+    if (animate && !REDUCED_MOTION) { lens.classList.remove("moving"); void lens.offsetWidth; lens.classList.add("moving"); }
+  };
+  const mark = v => btns.forEach(b => { const on = b.dataset.v === String(v); b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
+  const choose = (btn, animate = true) => {
+    mark(btn.dataset.v); place(btn, animate);
+    if (btn.dataset.v !== String(value)) { value = btn.dataset.v; onChange(value); }
+  };
+  btns.forEach(b => b.addEventListener("click", () => choose(b)));
+  // drag the lens like on iOS (a plain tap still works as a normal click)
+  let dragging = false, x0 = null;
+  host.addEventListener("pointerdown", e => { if (!REDUCED_MOTION) x0 = e.clientX; });
+  host.addEventListener("pointermove", e => {
+    if (x0 == null) return;
+    if (!dragging) { if (Math.abs(e.clientX - x0) < 6) return; dragging = true; host.classList.add("drag"); try { host.setPointerCapture(e.pointerId); } catch {} }
+    const hr = host.getBoundingClientRect(), w = lens.offsetWidth;
+    lens.style.left = `${Math.min(hr.width - w - 4, Math.max(4, e.clientX - hr.left - w / 2))}px`;
+    const mid = b => b.getBoundingClientRect().left + b.offsetWidth / 2;
+    const near = btns.reduce((a, b) => Math.abs(mid(b) - e.clientX) < Math.abs(mid(a) - e.clientX) ? b : a);
+    btns.forEach(b => b.classList.toggle("hover", b === near));
+  });
+  const end = () => {
+    x0 = null; if (!dragging) return; dragging = false; host.classList.remove("drag");
+    const near = host.querySelector("button.hover"); btns.forEach(b => b.classList.remove("hover"));
+    if (near) choose(near); else place(btns.find(b => b.dataset.v === String(value)) || btns[0], true);
+  };
+  host.addEventListener("pointerup", end); host.addEventListener("pointercancel", end);
+  const init = btns.find(b => b.dataset.v === String(value)) || btns[0];
+  mark(init.dataset.v); requestAnimationFrame(() => place(init, false));
+  new ResizeObserver(() => place(btns.find(b => b.classList.contains("on")) || btns[0], false)).observe(host);
+}
+function buildFastSeg() {
+  liquidSeg($("fastSeg"), [{ value: "all", label: T().allChargers }, { value: "fast", label: T().fastChargers }], fastOnly ? "fast" : "all", v => {
+    fastOnly = v === "fast"; store.set("fastOnly", fastOnly); refreshMap(); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false);
+  });
+}
+function buildKwhSeg() {
+  const opts = [...$("kwh").options].map((o, i) => ({ value: o.value,
+    label: myCar && i === 0 ? `${T().autoLbl} ${o.value}` : `${o.value}`, title: o.textContent }));
+  liquidSeg($("kwhSeg"), opts, $("kwh").value, v => { $("kwh").value = v; $("kwh").dispatchEvent(new Event("change")); });
+}
+
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
 function updateStats() {
@@ -551,12 +602,14 @@ function openOnboard(changing = false) {
 }
 function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) openCar(); else flyIntoLithuania(); }
 function setKwhOptions() {
-  const prev = $("kwh").value, opts = [20, 40, 60].map(k => `<option value="${k}">${k} kWh</option>`);
-  let auto = null;
-  if (myCar && myCar[4]) { auto = Math.round(myCar[4] * 0.7); opts.unshift(`<option value="${auto}">${T().autoKwh(auto)}</option>`); }
+  const prev = $("kwh").value;
+  let auto = myCar && myCar[4] ? Math.round(myCar[4] * 0.7) : null;
+  const opts = [20, 40, 60].filter(k => k !== auto).map(k => `<option value="${k}">${k} kWh</option>`);
+  if (auto) opts.unshift(`<option value="${auto}">${T().autoKwh(auto)}</option>`);
   $("kwh").innerHTML = opts.join("");
   $("kwh").value = auto && (!prev || store.get("kwhAuto", true)) ? String(auto) : (prev || "40");
   if (!$("kwh").value) $("kwh").value = "40";
+  buildKwhSeg();
 }
 $("carSearch").addEventListener("input", renderCarList);
 $("carList").addEventListener("click", async e => {
@@ -596,6 +649,7 @@ function applyLang() {
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = T()[el.dataset.t]);
   $("langBtn").textContent = lang === "lt" ? "EN" : "LT";
+  buildFastSeg();
   $("carSearch").placeholder = T().carSearchPh;
   if ($("kwh").options.length) setKwhOptions();
   if (!$("onboard").hidden) renderCarList();
@@ -612,11 +666,10 @@ function setUpdated() {
   const d = new Date(DATA.pub).toLocaleString(lang === "lt" ? "lt-LT" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   $("updated").textContent = T().updated(d);
 }
-function setChips() { $("fastChip").classList.toggle("on", fastOnly); $("unkChip").classList.toggle("on", hideUnknown); }
+function setChips() { $("unkChip").classList.toggle("on", hideUnknown); }
 $("langBtn").onclick = () => { lang = lang === "lt" ? "en" : "lt"; store.set("lang", lang); applyLang(); };
 $("infoBtn").onclick = () => $("infoModal").hidden = false;
 $("infoModal").addEventListener("click", e => { if (e.target.id === "infoModal") $("infoModal").hidden = true; });
-$("fastChip").onclick = () => { fastOnly = !fastOnly; store.set("fastOnly", fastOnly); setChips(); refreshMap(); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = bestCharge;
 $("origin").onchange = () => { store.set("origin", $("origin").value); bestCharge(); };
