@@ -213,6 +213,7 @@ function highlight() { if (map.getLayer("selected")) map.setFilter("selected", [
 
 // ---------- station detail ----------
 function select(i, fly = true) {
+  requestAnimationFrame(() => { if (isPhone()) snapSheet("half"); });
   selected = i; refreshMap(false);
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
@@ -261,7 +262,7 @@ function select(i, fly = true) {
   setupSwipe(l);
   if (fly) cinematicTo(l);
 }
-function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; $("home").classList.remove("enter"); void $("home").offsetWidth; $("home").classList.add("enter"); }
+function closeDetail() { requestAnimationFrame(() => snapSheet(sheetState)); selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; $("home").classList.remove("enter"); void $("home").offsetWidth; $("home").classList.add("enter"); }
 
 // ---------- navigation hand-off ----------
 const NAV_NAMES = { google: "Google Maps", waze: "Waze", apple: "Apple Maps" };
@@ -377,6 +378,7 @@ async function getOrigin() {
 
 // ---------- Best Charge ----------
 async function bestCharge() {
+  if (isPhone() && sheetState === "peek") snapSheet("half");
   const t = T(), kwh = +$("kwh").value;
   const origin = await getOrigin();
   if (!origin) return;
@@ -566,6 +568,96 @@ function buildKwhSeg() {
   liquidSeg($("kwhSeg"), opts, $("kwh").value, v => { $("kwh").value = v; $("kwh").dispatchEvent(new Event("change")); });
 }
 
+// ---------- Waze-style bottom sheet (phones) ----------
+// The panel is a sheet you drag with your finger. It snaps to three heights: peek (just the main
+// button), half, and full. A quick flick decides the direction; otherwise it snaps to the nearest.
+// Floating buttons ride just above it. On a computer it is a fixed side panel instead.
+const isPhone = () => window.innerWidth < 760;
+const sheet = $("panel");
+let sheetState = "half", sheetY = 0, snaps = { full: 0, half: 0, peek: 0 };
+function measureSheet() {
+  const H = sheet.offsetHeight, vh = window.innerHeight;
+  const anchor = $("detail").hidden ? sheet.querySelector(".actions") : $("dAmt");
+  const peekVis = anchor ? Math.min(H, anchor.offsetTop + anchor.offsetHeight + 18) : 120;
+  snaps = { full: 0, half: Math.max(0, H - Math.round(vh * 0.52)), peek: Math.max(0, H - peekVis) };
+  return H;
+}
+function setSheetY(y, animate) {
+  sheetY = y;
+  sheet.classList.toggle("anim", !!animate); document.documentElement.classList.toggle("sheet-moving", !animate);
+  sheet.style.transform = isPhone() ? `translateY(${Math.round(y)}px)` : "";
+  const vis = isPhone() ? sheet.offsetHeight - y : 0;
+  document.documentElement.style.setProperty("--sheet-vis", `${Math.max(0, Math.round(vis))}px`);
+  document.documentElement.classList.toggle("fab-off", isPhone() && vis > window.innerHeight * 0.68);
+}
+function snapSheet(state = sheetState, animate = true) {
+  if (!isPhone()) { sheet.classList.add("at-full"); setSheetY(0, false); return; }
+  measureSheet(); sheetState = state;
+  sheet.classList.toggle("at-full", state === "full");
+  if (state !== "full") sheet.scrollTop = 0;
+  setSheetY(snaps[state], animate && !REDUCED_MOTION);
+}
+let suppressClickUntil = 0;
+sheet.addEventListener("click", ev => { if (performance.now() < suppressClickUntil) { ev.stopPropagation(); ev.preventDefault(); } }, { capture: true });
+(() => {
+  let start = null, dragging = false, fromHandle = false, samples = [];
+  sheet.addEventListener("pointerdown", e => {
+    if (!isPhone() || e.button > 0) return;
+    fromHandle = !!e.target.closest("#grab") || e.clientY - sheet.getBoundingClientRect().top < 30;
+    if (sheetState === "full" && !fromHandle) return;           // at full height the content scrolls instead
+    start = { y: e.clientY, y0: sheetY, id: e.pointerId }; dragging = false; samples = [[performance.now(), e.clientY]];
+  });
+  // follow the finger anywhere on screen (it often leaves the sheet while dragging it up)
+  window.addEventListener("pointermove", e => {
+    if (!start || e.pointerId !== start.id) return;
+    const dy = e.clientY - start.y;
+    if (!dragging) { if (Math.abs(dy) < 8) return; dragging = true; }
+    let y = start.y0 + dy;
+    if (y < 0) y = y / 3;                                        // rubber band past the top
+    if (y > snaps.peek) y = snaps.peek + (y - snaps.peek) / 3;   // and past the bottom
+    setSheetY(y, false);
+    samples.push([performance.now(), e.clientY]); if (samples.length > 5) samples.shift();
+  });
+  const end = e => {
+    if (!start) return;
+    const wasDrag = dragging; start = null; dragging = false;
+    if (!wasDrag) return;
+    const [t0, y0] = samples[0], [t1, y1] = samples[samples.length - 1];
+    const v = (y1 - y0) / Math.max(1, t1 - t0);                 // px per ms, + is down
+    const order = ["full", "half", "peek"].filter(s => s !== "half" || snaps.half > 40);
+    let target;
+    if (Math.abs(v) > 0.45) {
+      const sorted = order.map(s => [s, snaps[s]]).sort((a, b) => a[1] - b[1]);
+      target = v > 0 ? (sorted.find(([, y]) => y > sheetY + 4) || sorted[sorted.length - 1])[0]
+                     : ([...sorted].reverse().find(([, y]) => y < sheetY - 4) || sorted[0])[0];
+    } else target = order.reduce((a, b) => Math.abs(snaps[b] - sheetY) < Math.abs(snaps[a] - sheetY) ? b : a);
+    snapSheet(target);
+    // a drag is not a tap: swallow the click that follows
+    suppressClickUntil = performance.now() + 350;
+  };
+  window.addEventListener("pointerup", end); window.addEventListener("pointercancel", end);
+  $("grab").addEventListener("click", () => snapSheet(sheetState === "peek" ? "half" : sheetState === "half" ? "full" : "peek"));
+  $("grab").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("grab").click(); } });
+})();
+map.on("dragstart", () => { if (isPhone() && sheetState !== "peek") snapSheet("peek"); });
+window.addEventListener("resize", () => snapSheet(sheetState, false));
+new ResizeObserver(() => { if (!document.documentElement.classList.contains("sheet-moving")) snapSheet(sheetState, false); }).observe(sheet);
+
+// floating "my location" button: start from where you are and show it
+$("locBtn").onclick = () => { $("origin").value = "me"; $("origin").dispatchEvent(new Event("change")); };
+
+// ---------- quick start-point chips (like Home / Work in Waze) ----------
+function buildOriginChips() {
+  const opts = [...$("origin").options];
+  $("originChips").innerHTML = opts.map(o => `<button type="button" role="radio" class="qchip${o.value === $("origin").value ? " on" : ""}" data-v="${o.value}" aria-checked="${o.value === $("origin").value}">${
+    o.value === "me" ? '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M21 3 3 10.5l7.2 2.3L12.5 20z" fill="currentColor"/></svg>' :
+    o.value === "home" ? '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z" fill="currentColor"/></svg>' : ""}${o.textContent}</button>`).join("");
+}
+$("originChips").addEventListener("click", e => {
+  const b = e.target.closest("[data-v]"); if (!b) return;
+  $("origin").value = b.dataset.v; $("origin").dispatchEvent(new Event("change"));
+});
+
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
 function updateStats() {
@@ -656,6 +748,7 @@ function applyLang() {
   $("origin").innerHTML = `<option value="me">${T().originMe}</option><option value="home">${T().originHome}</option>` +
     CITIES.map(c => `<option value="${c.id}">${c.en}</option>`).join("");
   $("origin").value = store.get("origin", homeLoc ? "home" : "me");
+  buildOriginChips();
   $("infoBody").innerHTML = T().about + `<button class="secondary" id="infoClose">${T().close}</button>`;
   $("infoClose").onclick = () => $("infoModal").hidden = true;
   setUpdated(); updateStats();
@@ -672,11 +765,11 @@ $("infoBtn").onclick = () => $("infoModal").hidden = false;
 $("infoModal").addEventListener("click", e => { if (e.target.id === "infoModal") $("infoModal").hidden = true; });
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = bestCharge;
-$("origin").onchange = () => { store.set("origin", $("origin").value); bestCharge(); };
+$("origin").onchange = () => { store.set("origin", $("origin").value); buildOriginChips(); bestCharge(); };
 $("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
-applyLang(); setChips(); setKwhOptions(); initAuth();
+applyLang(); setChips(); setKwhOptions(); initAuth(); requestAnimationFrame(() => snapSheet("half", false));
 if (!store.get("onboarded", false)) openOnboard();
 const dataReady = fetch(DATA_URL, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
   DATA = d;

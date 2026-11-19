@@ -331,3 +331,62 @@ select:focus,input:focus{outline:none;border-color:#3d6bff;box-shadow:0 0 0 3px 
 #kwhSeg button{font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion: reduce){.seg .lens,.seg button{transition:none;animation:none!important}}
 .filters .seg button{flex:0 0 auto}
+
+/* =========================================================
+   Phone & web layout (Waze-style)
+   ========================================================= */
+html,body{height:100%;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+body{position:fixed;inset:0;-webkit-text-size-adjust:100%}
+select,input{font-size:16px}           /* stops iOS from zooming into form fields */
+
+/* drag handle: a wide, easy-to-grab strip with a small pill in the middle */
+.grab{display:block;width:auto!important;height:26px!important;margin:-6px -14px 4px!important;background:none!important;border:0;
+  cursor:grab;touch-action:none;position:relative}
+.grab span{position:absolute;left:50%;top:10px;width:42px;height:5px;margin-left:-21px;border-radius:5px;background:rgba(255,255,255,.32)}
+
+/* phone: full-height sheet that slides; only the visible part is shown */
+@media (max-width:759px){
+  .panel{top:calc(62px + var(--safe-t))!important;bottom:0!important;left:6px!important;right:6px!important;max-height:none!important;height:auto;
+    border-radius:28px 28px 0 0!important;padding:6px 14px calc(16px + var(--safe-b))!important;overflow:hidden;touch-action:none;will-change:transform;
+    overscroll-behavior:contain}
+  .panel.at-full{overflow-y:auto;touch-action:pan-y}
+  .panel.anim{transition:transform .55s cubic-bezier(.22,1,.36,1)}
+  .maplibregl-ctrl-bottom-right{display:none}
+  /* floating round button rides above the sheet, like the Waze buttons */
+  .fab{bottom:calc(var(--sheet-vis,200px) + 12px)}
+}
+/* computer: fixed side panel, map fills the rest */
+@media (min-width:760px){
+  .panel{top:calc(146px + var(--safe-t))!important;bottom:14px!important;left:14px!important;right:auto!important;width:400px!important;max-height:none!important;
+    border-radius:26px!important;overflow-y:auto;transform:none!important}
+  .grab{display:none!important}
+  .fab{bottom:24px}
+  .maplibregl-ctrl-bottom-right{top:auto!important;bottom:84px!important}
+}
+
+.fab{position:fixed;right:14px;z-index:7;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#fff;cursor:pointer;
+  background:linear-gradient(160deg,rgba(255,255,255,.14),rgba(255,255,255,.03)),rgba(16,22,38,.55);border:1px solid rgba(255,255,255,.18);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 24px rgba(0,0,0,.45);transition:bottom .55s cubic-bezier(.22,1,.36,1),transform .2s}
+.sheet-moving .fab{transition:transform .2s}
+.fab:active{transform:scale(.92)}
+
+/* quick start-point chips, scrolling sideways like Home / Work in Waze */
+.chiprow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 2px 4px;margin:0 -2px;flex:1;touch-action:pan-x}
+.chiprow::-webkit-scrollbar{display:none}
+.qchip{flex:none;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;min-height:40px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;color:var(--ink);font-family:inherit;
+  background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.03)),rgba(16,22,38,.45);border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25);transition:transform .18s,background .25s,border-color .25s}
+.qchip.on{background:linear-gradient(160deg,rgba(255,255,255,.24),rgba(255,255,255,0) 55%),linear-gradient(135deg,rgba(49,86,255,.85),rgba(36,51,220,.85));border-color:rgba(186,204,255,.45);color:#fff}
+.qchip:active{transform:scale(.95)}
+
+/* bigger touch targets on phones */
+@media (max-width:759px){
+  .chip,.pill-btn{min-height:40px}
+  .seg button{min-height:38px}
+  .go{min-height:54px}
+}
+
+.fab{transition:opacity .25s ease,transform .25s ease}
+html.fab-off .fab{opacity:0;transform:scale(.8);pointer-events:none}
+@media (min-width:760px){.panel{bottom:auto!important;max-height:calc(100dvh - 160px - var(--safe-t,0px))!important}}
