@@ -85,43 +85,13 @@ const map = new maplibregl.Map({
   container: "map", style: MAP_STYLE, attributionControl: { compact: true },
   // first visit starts from space and flies in; later visits open straight on Lithuania
   ...(firstVisit ? { center: [23.9, 50], zoom: 1.6 } : LITHUANIA),
-  minZoom: 0.6, maxPitch: 85, dragRotate: true, touchPitch: true, pitchWithRotate: true, renderWorldCopies: false,
+  maxPitch: 75, dragRotate: true, touchPitch: true, pitchWithRotate: true,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
-// Smoother feel: the globe keeps gliding after a flick and slows down gently; wheel zoom is softer.
-try {
-  map.dragPan.enable({ linearity: 0.25, easing: t => 1 - Math.pow(1 - t, 3), maxSpeed: 1600, deceleration: 1800 });
-  map.scrollZoom.setWheelZoomRate(1 / 600); map.scrollZoom.setZoomRate(1 / 140);
-} catch {}
 map.on("style.load", () => {
   try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
-  // blue atmosphere glowing around the edge of the globe, fading out as you zoom in
-  // thin, cool-grey atmosphere rim: just enough to separate the dark globe from space
-  try { map.setSky({ "sky-color": "#05070c", "horizon-color": "#2a3346", "fog-color": "#05070c",
-    "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.7, "fog-ground-blend": 0.9,
-    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 9, 0] }); } catch {}
-  nightEarth();
+  try { map.setSky({ "sky-color": "#0b1530", "horizon-color": "#1e3a5f", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
 });
-
-// Night look in consistent dark and black shades: black seas, charcoal land, faint grey roads and soft labels.
-function nightEarth() {
-  const set = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch {} };
-  for (const ly of map.getStyle().layers) {
-    const sl = ly["source-layer"] || "", id = ly.id;
-    if (ly.type === "background") set(id, "background-color", "#0b0f17");
-    else if (sl === "water" && ly.type === "fill") { set(id, "fill-color", "#04060b"); set(id, "fill-outline-color", "#151b27"); }
-    else if (sl === "waterway") set(id, "line-color", "#06090f");
-    else if ((sl === "landcover" || sl === "landuse" || sl === "park") && ly.type === "fill") { set(id, "fill-color", "#0d121b"); set(id, "fill-opacity", 0.5); }
-    else if (sl === "building" && ly.type === "fill") set(id, "fill-color", "#121824");
-    else if (sl === "building" && ly.type === "fill-extrusion") set(id, "fill-extrusion-color", "#151c2a");
-    else if (sl === "transportation" && ly.type === "line") set(id, "line-color", ["interpolate", ["linear"], ["zoom"], 6, "rgba(255,255,255,0.05)", 12, "rgba(255,255,255,0.14)", 16, "rgba(255,255,255,0.22)"]);
-    else if (sl === "boundary" && ly.type === "line") set(id, "line-color", "rgba(255,255,255,0.18)");
-    else if (ly.type === "symbol") {
-      if (/poi|housenumber/.test(id)) { try { map.setLayoutProperty(id, "visibility", "none"); } catch {} }
-      else { set(id, "text-color", "#8a93a3"); set(id, "text-halo-color", "rgba(4,6,11,0.9)"); }
-    }
-  }
-}
 
 // Price level of a location, used for both the colour and the marker icon.
 const levelKey = p => p == null ? "unk" : p === 0 ? "free" : p <= 0.29 ? "cheap" : p <= 0.37 ? "mid" : "high";
@@ -229,14 +199,8 @@ async function addLayers() {
     paint: { "line-color": ["get", "c"], "line-width": ["case", ["==", ["get", "best"], 1], 3, 2], "line-opacity": 0.95 } }, "glow");
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
-  // start point as a glowing white ring with a bright core
-  map.addLayer({ id: "me-halo", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#9cc3ff"], "circle-radius": 22, "circle-blur": 1, "circle-opacity": 0.55 } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": "#ffffff", "circle-radius": 5.5, "circle-stroke-color": "rgba(255,255,255,0.9)", "circle-stroke-width": 2,
-      "circle-stroke-opacity": 0.9, "circle-pitch-alignment": "map" } });
-  map.addLayer({ id: "me-ring", type: "circle", source: "me",
-    paint: { "circle-color": "rgba(0,0,0,0)", "circle-radius": 13, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.6, "circle-stroke-opacity": 0.85 } });
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
   for (const layer of ["badges", "selected"]) {
     map.on("click", layer, e => select(e.features[0].properties.i, false));
     map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
@@ -249,7 +213,6 @@ function highlight() { if (map.getLayer("selected")) map.setFilter("selected", [
 
 // ---------- station detail ----------
 function select(i, fly = true) {
-  setCollapsed(false);
   selected = i; refreshMap(false);
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
@@ -414,7 +377,6 @@ async function getOrigin() {
 
 // ---------- Best Charge ----------
 async function bestCharge() {
-  setCollapsed(false);
   const t = T(), kwh = +$("kwh").value;
   const origin = await getOrigin();
   if (!origin) return;
@@ -514,31 +476,16 @@ function drawLinks(originPos, targets) {
   linkAnim = requestAnimationFrame(step);
 }
 
-// Slowly spinning globe (welcome screen, or when left zoomed out). It turns every frame instead of in
-// steps, eases in when it starts, and stops the moment the map is touched.
-let spinning = false, spinRaf = 0, spinStart = 0, spinLast = 0;
-const SPIN_DEG_PER_SEC = 4;
-function spinFrame(now) {
+// Slowly spinning globe behind the welcome screen; stops as soon as the map is touched.
+let spinning = false;
+function spinStep() {
   if (!spinning) return;
-  if (map.getZoom() >= 3.5) { spinning = false; return; }
-  const dt = Math.min(0.05, (now - spinLast) / 1000); spinLast = now;
-  const ramp = Math.min(1, (now - spinStart) / 1500);            // ease in over 1.5 s
-  const c = map.getCenter(); c.lng -= SPIN_DEG_PER_SEC * dt * ramp * ramp;
-  map.jumpTo({ center: c });
-  spinRaf = requestAnimationFrame(spinFrame);
+  const c = map.getCenter(); c.lng -= 8;
+  map.easeTo({ center: c, duration: 1000, easing: t => t, essential: true });
 }
-function startSpin() {
-  if (REDUCED_MOTION || spinning) return;
-  spinning = true; spinStart = spinLast = performance.now(); spinRaf = requestAnimationFrame(spinFrame);
-}
-function stopSpin() { spinning = false; cancelAnimationFrame(spinRaf); clearTimeout(idleSpin.h); }
-// When you leave the map zoomed out to the whole planet, it starts turning slowly after a few seconds.
-function idleSpin() {
-  clearTimeout(idleSpin.h);
-  if (REDUCED_MOTION) return;
-  idleSpin.h = setTimeout(() => { if (map.getZoom() < 3.5 && !spinning) startSpin(); }, 4000);
-}
-map.on("idle", () => { if (!spinning && map.getZoom() < 3.5) idleSpin(); });
+function startSpin() { if (REDUCED_MOTION) return; spinning = true; spinStep(); }
+function stopSpin() { spinning = false; }
+map.on("moveend", () => { if (spinning) spinStep(); });
 for (const ev of ["mousedown", "touchstart", "wheel", "dragstart"]) map.on(ev, stopSpin);
 function flyIntoLithuania() {
   stopSpin();
@@ -567,19 +514,6 @@ if (!REDUCED_MOTION) document.addEventListener("pointermove", e => {
   el.style.setProperty("--gx", `${((e.clientX - r.left) / r.width) * 100}%`);
   el.style.setProperty("--gy", `${((e.clientY - r.top) / r.height) * 100}%`);
 }, { passive: true });
-
-// ---------- bottom panel: tuck away to see more map ----------
-const isPhone = () => window.innerWidth < 760;
-function setCollapsed(on) { $("panel").classList.toggle("collapsed", on); $("grab").setAttribute("aria-expanded", String(!on)); }
-$("grab").addEventListener("click", () => setCollapsed(!$("panel").classList.contains("collapsed")));
-// dragging the handle down tucks the panel away; up brings it back
-(() => { let y0 = null;
-  $("grab").addEventListener("pointerdown", e => { y0 = e.clientY; });
-  window.addEventListener("pointerup", e => { if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
-    if (dy > 30) setCollapsed(true); else if (dy < -30) setCollapsed(false); });
-})();
-// when you start exploring the map on a phone, the panel gets out of the way
-map.on("dragstart", () => { if (isPhone()) setCollapsed(true); });
 
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
