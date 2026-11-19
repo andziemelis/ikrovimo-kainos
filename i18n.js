@@ -105,6 +105,7 @@ const I18N = {
     updated: d => `Kainos atnaujintos ${d} · Duomenys: Via Lietuva`,
     loadFail: "Nepavyko įkelti įkrovimo duomenų. Pabandykite vėliau.",
     cityPrefix: "šalia",
+    aboutBtn: "Apie",
     about: `<h3>Apie</h3>
       <p>Tai ankstyva programėlės versija, padedanti rasti pigiausią elektromobilio įkrovimą Lietuvoje.</p>
       <p><b>Kainos</b> – tai operatorių paskelbti tarifai iš Lietuvos nacionalinės įkrovimo prieigų duomenų bazės. Jei vietoje skelbiamos kelios kainos, rodoma mažiausia, todėl tikroji kaina gali būti didesnė, priklausomai nuo įkroviklio, mokėjimo būdo ar narystės. Kainos yra orientacinės.</p>
@@ -217,6 +218,7 @@ const I18N = {
     updated: d => `Prices updated ${d} · Data: Via Lietuva`,
     loadFail: "Couldn't load the charging data. Please try again later.",
     cityPrefix: "near",
+    aboutBtn: "About",
     about: `<h3>About</h3>
       <p>This is an early version of an app that helps you find the cheapest place to charge your electric car in Lithuania.</p>
       <p><b>Prices</b> are the operators' own published tariffs from Lithuania's national charging database. Where a location lists several prices, the lowest is shown, so the real price can be higher depending on the charger, payment method or membership. Treat prices as estimates.</p>

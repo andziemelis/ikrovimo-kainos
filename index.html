@@ -18,29 +18,14 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611191113">
+<link rel="stylesheet" href="style.css?v=202611191201">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
 
 <header class="top">
   <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M13.5 2 5 13.5h6L9.5 22 19 9.5h-6.2z" fill="currentColor"/></svg></span><span data-t="appName"></span></div>
-  <div class="top-actions">
-    <button class="pill-btn" id="langBtn" aria-label="Language">EN</button>
-    <button class="pill-btn" id="infoBtn" aria-label="About">i</button>
-  </div>
 </header>
-
-<div class="statcard" id="statcard" hidden>
-  <span class="pulse-dot" aria-hidden="true"></span>
-  <span><b id="statN"></b> <span id="statLbl"></span></span>
-  <span class="stat-age" id="statAge"></span>
-</div>
-
-<div class="filters">
-  <div class="seg" id="fastSeg" role="radiogroup" aria-label="Chargers"></div>
-  <button class="chip" id="unkChip" data-t="hideUnknown"></button>
-</div>
 
 <button class="fab" id="locBtn" aria-label="My location"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M21 3 3 10.5l7.2 2.3L12.5 20z" fill="currentColor"/></svg></button>
 
@@ -54,6 +39,10 @@
     <div class="row">
       <div class="chiprow" id="originChips" role="radiogroup" aria-label="Start point"></div>
       <select id="origin" class="sr-only" tabindex="-1" aria-hidden="true"></select>
+    </div>
+    <div class="row filters">
+      <div class="seg" id="fastSeg" role="radiogroup" aria-label="Chargers"></div>
+      <button class="chip" id="unkChip" data-t="hideUnknown"></button>
     </div>
     <div class="row">
       <label class="lbl" data-t="howMuch"></label>
@@ -71,6 +60,17 @@
       <span><i class="c-mid"></i><span data-t="average"></span></span>
       <span><i class="c-high"></i><span data-t="expensive"></span></span>
       <span><i class="c-unk"></i><span data-t="noPrice"></span></span>
+    </div>
+    <div class="sheet-foot">
+      <div class="statline" id="statcard" hidden>
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <span><b id="statN"></b> <span id="statLbl"></span></span>
+        <span class="stat-age" id="statAge"></span>
+      </div>
+      <div class="foot-btns">
+        <button class="textbtn" id="langBtn" aria-label="Language">EN</button>
+        <button class="textbtn" id="infoBtn" data-t="aboutBtn"></button>
+      </div>
     </div>
     <div class="updated" id="updated"></div>
   </div>
@@ -141,7 +141,7 @@
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="i18n.js?v=202611191113"></script>
-<script src="app.js?v=202611191113"></script>
+<script src="i18n.js?v=202611191201"></script>
+<script src="app.js?v=202611191201"></script>
 </body>
 </html>

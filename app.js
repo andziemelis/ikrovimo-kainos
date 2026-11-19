@@ -578,7 +578,8 @@ let sheetState = "half", sheetY = 0, snaps = { full: 0, half: 0, peek: 0 };
 function measureSheet() {
   const H = sheet.offsetHeight, vh = window.innerHeight;
   const anchor = $("detail").hidden ? sheet.querySelector(".actions") : $("dAmt");
-  const peekVis = anchor ? Math.min(H, anchor.offsetTop + anchor.offsetHeight + 18) : 120;
+  const padB = parseFloat(getComputedStyle(sheet).paddingBottom) || 18;
+  const peekVis = anchor ? Math.min(H, anchor.offsetTop + anchor.offsetHeight + Math.max(16, padB)) : 120;
   snaps = { full: 0, half: Math.max(0, H - Math.round(vh * 0.52)), peek: Math.max(0, H - peekVis) };
   return H;
 }
@@ -589,6 +590,9 @@ function setSheetY(y, animate) {
   const vis = isPhone() ? sheet.offsetHeight - y : 0;
   document.documentElement.style.setProperty("--sheet-vis", `${Math.max(0, Math.round(vis))}px`);
   document.documentElement.classList.toggle("fab-off", isPhone() && vis > window.innerHeight * 0.68);
+  const span = snaps.peek - snaps.half;
+  const p = !isPhone() || span < 20 ? 1 : Math.min(1, Math.max(0, (snaps.peek - y) / span));
+  document.documentElement.style.setProperty("--sheet-p", p.toFixed(3));
 }
 function snapSheet(state = sheetState, animate = true) {
   if (!isPhone()) { sheet.classList.add("at-full"); setSheetY(0, false); return; }

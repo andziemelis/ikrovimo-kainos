@@ -390,3 +390,48 @@ select,input{font-size:16px}           /* stops iOS from zooming into form field
 .fab{transition:opacity .25s ease,transform .25s ease}
 html.fab-off .fab{opacity:0;transform:scale(.8);pointer-events:none}
 @media (min-width:760px){.panel{bottom:auto!important;max-height:calc(100dvh - 160px - var(--safe-t,0px))!important}}
+
+/* ===== Clean layout: almost empty top, everything lives in the sheet ===== */
+.brand{padding:6px 12px 6px 6px!important;font-size:14px!important;border-radius:14px!important;gap:8px}
+.brand .logo{width:26px;height:26px;border-radius:8px}
+.panel .filters{position:static;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px}
+.panel .filters .seg{flex:0 0 auto}
+.panel .filters .chip{flex:0 1 auto;min-height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel .row{margin-top:10px}
+.sheet-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:var(--muted)}
+.statline{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.statline b{color:var(--ink);font-variant-numeric:tabular-nums}
+.statline .stat-age::before{content:"·";margin-right:8px;opacity:.6}
+.foot-btns{display:flex;gap:4px;flex:none}
+.textbtn{background:rgba(255,255,255,.06);border:0;color:var(--ink);font:600 12.5px/1 inherit;font-family:inherit;padding:9px 12px;border-radius:999px;cursor:pointer}
+.textbtn:active{background:rgba(255,255,255,.12)}
+.legend{margin-top:12px}
+.updated{margin-top:6px;opacity:.75}
+
+@media (max-width:759px){
+  /* Edge-to-edge sheet, one solid surface, rounded only on top */
+  .panel{left:0!important;right:0!important;top:calc(60px + var(--safe-t))!important;
+    border-radius:28px 28px 0 0!important;border:0!important;border-top:1px solid rgba(255,255,255,.10)!important;
+    background:linear-gradient(180deg,rgba(30,34,46,.94),rgba(14,16,23,.97) 140px)!important;
+    -webkit-backdrop-filter:blur(26px) saturate(160%)!important;backdrop-filter:blur(26px) saturate(160%)!important;
+    box-shadow:0 -10px 40px rgba(0,0,0,.45)!important;padding:0 16px calc(18px + var(--safe-b))!important}
+  .panel::before,.panel::after{display:none!important}
+  .grab{height:26px!important;padding:0!important;display:flex!important;align-items:center;justify-content:center}
+  .grab span{width:38px!important;height:5px!important;border-radius:3px;background:rgba(255,255,255,.28)!important}
+  /* Rows below the main button fade in as the sheet rises (Waze-like) */
+  #home > :not(.actions){opacity:var(--sheet-p,1);transition:opacity .2s linear}
+  html.sheet-moving #home > :not(.actions){transition:none}
+  .go{min-height:52px;border-radius:16px}
+  .actions .secondary{width:52px;min-height:52px;border-radius:16px}
+  .fab{width:48px!important;height:48px!important;right:14px!important}
+}
+@media (min-width:760px){
+  .panel{top:calc(64px + var(--safe-t))!important}
+}
+.statline{display:grid;grid-template-columns:auto 1fr;column-gap:8px;row-gap:2px;align-items:center}
+.statline .stat-age{grid-column:2}
+.statline .stat-age::before{content:none}
+@media (max-width:759px){
+  .chiprow{margin-left:-16px!important;margin-right:-16px!important;padding-left:16px!important;padding-right:16px!important;scroll-padding-left:16px;scrollbar-width:none}
+  .chiprow::-webkit-scrollbar{display:none}
+}
