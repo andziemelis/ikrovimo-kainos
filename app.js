@@ -285,17 +285,17 @@ async function bestCharge() {
   const top = [];
   for (const x of paid) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
   pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
-  $("results").innerHTML = `<div class="res-head">${t.resultsFrom(origin.label, kwh)}</div>` + top.map(x => {
+  // Kept deliberately short: one total, where, and the saving. The breakdown lives in the station card.
+  $("results").innerHTML = `<div class="res-head">${t.resultsHead}</div>` + top.map((x, n) => {
     const saving = nearest.c.total - x.c.total;
-    const badge = x === nearest ? `<span class="save">${t.isNearest}</span>` : saving > 0.2 ? `<span class="save">${t.vsNearest(money(saving))}</span>` : "";
-    return `<div class="pick" data-i="${x.l.i}">
-      <div class="amt" style="color:${colourOf(x.p)}">${money(x.c.total)}</div>
-      <div class="meta"><b>${x.o.op}</b> · ${townOf(x.l)} · ${t.away(x.c.oneWay.toFixed(1))}<br>
-        <span class="breakdown">${t.breakdown(money(x.c.charge), money(x.c.trip))} · ${kwhPrice(x.p)}${x.o.pk || x.o.fx ? " · " + t.extraFees : ""}</span>
-        ${badge ? "<br>" + badge : ""}</div>
+    const extra = x === nearest ? t.isNearest : saving > 0.2 ? t.saves(money(saving)) : "";
+    return `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}">
+      <div class="amt">${money(x.c.total)}</div>
+      <div class="meta"><b>${x.o.op}</b><span>${x.c.oneWay.toFixed(1)} km${extra ? ` · <em>${extra}</em>` : ""}</span></div>
       <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
     </div>`;
-  }).join("") + `<div class="note">${t.tripNote(money(car.wear), money(car.timeVal), car.cons)}${freeN ? " " + t.freeNearby(freeN) : ""}</div>`;
+  }).join("");
+  document.querySelector(".legend").hidden = true;
   $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
     const nav = e.target.closest("[data-nav]");
     if (nav) { e.stopPropagation(); navigate(L[+nav.dataset.nav]); } else select(+el.dataset.i);

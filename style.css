@@ -92,3 +92,13 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .maplibregl-ctrl-attrib{background:rgba(15,24,38,.85)!important;color:var(--muted)}
 .maplibregl-ctrl-attrib a{color:var(--muted)!important}
 .maplibregl-ctrl-attrib-button{filter:invert(1)}
+
+/* simplified results */
+.pick{gap:14px;padding:12px 12px 12px 14px}
+.pick .amt{font-size:22px;font-weight:800;min-width:84px;color:var(--ink)}
+.pick .meta{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.pick .meta b{font-size:15px}
+.pick .meta em{font-style:normal;color:#86efac;font-weight:600}
+.pick.first{border-color:#16a34a;background:rgba(22,163,74,.10)}
+.pick.first .amt{color:#4ade80}
+.legend[hidden]{display:none}

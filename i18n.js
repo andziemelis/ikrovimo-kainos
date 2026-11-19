@@ -2,6 +2,8 @@
 const I18N = {
   lt: {
     fromLbl: "Iš:",
+    resultsHead: "Geriausi variantai · kaina su kelione",
+    saves: a => `sutaupote ${a}`,
     originMe: "Mano vieta",
     originHome: "Namai",
     originMeShort: "jūsų vieta",
@@ -78,6 +80,8 @@ const I18N = {
   },
   en: {
     fromLbl: "From:",
+    resultsHead: "Best options · price includes the trip",
+    saves: a => `saves ${a}`,
     originMe: "My location",
     originHome: "Home",
     originMeShort: "your location",
