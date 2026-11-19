@@ -90,8 +90,32 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
 map.on("style.load", () => {
   try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
-  try { map.setSky({ "sky-color": "#0b1530", "horizon-color": "#1e3a5f", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
+  // blue atmosphere glowing around the edge of the globe, fading out as you zoom in
+  try { map.setSky({ "sky-color": "#0a1f4d", "horizon-color": "#3d7be0", "fog-color": "#0a1f4d",
+    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.8, "fog-ground-blend": 0.9,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 9, 0] }); } catch {}
+  nightEarth();
 });
+
+// "Earth at night" look: deep blue seas, near-black land, faint roads and borders, soft labels.
+function nightEarth() {
+  const set = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch {} };
+  for (const ly of map.getStyle().layers) {
+    const sl = ly["source-layer"] || "", id = ly.id;
+    if (ly.type === "background") set(id, "background-color", "#040a19");
+    else if (sl === "water" && ly.type === "fill") { set(id, "fill-color", ["interpolate", ["linear"], ["zoom"], 2, "#1b4a8c", 8, "#163f78", 13, "#123563"]); set(id, "fill-outline-color", "#2a63b5"); }
+    else if (sl === "waterway") set(id, "line-color", "#1d4f91");
+    else if ((sl === "landcover" || sl === "landuse" || sl === "park") && ly.type === "fill") { set(id, "fill-color", "#07122a"); set(id, "fill-opacity", 0.6); }
+    else if (sl === "building" && ly.type === "fill") set(id, "fill-color", "#0c1a36");
+    else if (sl === "building" && ly.type === "fill-extrusion") set(id, "fill-extrusion-color", "#0f2145");
+    else if (sl === "transportation" && ly.type === "line") set(id, "line-color", ["interpolate", ["linear"], ["zoom"], 6, "rgba(120,160,230,0.10)", 12, "rgba(120,160,230,0.32)", 16, "rgba(150,185,245,0.45)"]);
+    else if (sl === "boundary" && ly.type === "line") set(id, "line-color", "rgba(140,180,255,0.35)");
+    else if (ly.type === "symbol") {
+      if (/poi|housenumber/.test(id)) { try { map.setLayoutProperty(id, "visibility", "none"); } catch {} }
+      else { set(id, "text-color", "#9fb6e0"); set(id, "text-halo-color", "rgba(4,10,25,0.85)"); }
+    }
+  }
+}
 
 // Price level of a location, used for both the colour and the marker icon.
 const levelKey = p => p == null ? "unk" : p === 0 ? "free" : p <= 0.29 ? "cheap" : p <= 0.37 ? "mid" : "high";
@@ -191,6 +215,16 @@ async function addLayers() {
     paint: { "circle-color": ["get", "c"], "circle-blur": 1,
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["case", ["==", ["get", "pin"], 1], 16, 7], 14, ["case", ["==", ["get", "pin"], 1], 34, 18]],
       "circle-opacity": ["case", ["==", ["get", "pin"], 1], 0.6, 0.28] } }, "badges");
+  // Charging locations as night lights, like cities seen from space: every location, warm and glowing,
+  // strongest from far away and fading out as the badges take over.
+  map.addSource("lights", { type: "geojson", data: { type: "FeatureCollection",
+    features: L.map(l => ({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] }, properties: {} })) } });
+  map.addLayer({ id: "lights-halo", type: "circle", source: "lights", maxzoom: 13,
+    paint: { "circle-color": "#ffcf6b", "circle-blur": 1, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 3, 8, 7, 12, 10],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 9, 0.22, 12.5, 0] } }, "glow");
+  map.addLayer({ id: "lights", type: "circle", source: "lights", maxzoom: 13,
+    paint: { "circle-color": "#fff3c4", "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 0.8, 8, 1.6, 12, 2.2],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.95, 10, 0.6, 12.5, 0] } }, "glow");
   // animated "data connection" lines from the start point to the Best Charge results
   map.addSource("links", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "links-glow", type: "line", source: "links", layout: { "line-cap": "round" },
@@ -199,8 +233,14 @@ async function addLayers() {
     paint: { "line-color": ["get", "c"], "line-width": ["case", ["==", ["get", "best"], 1], 3, 2], "line-opacity": 0.95 } }, "glow");
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
+  // start point as a glowing white ring with a bright core
+  map.addLayer({ id: "me-halo", type: "circle", source: "me",
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#9cc3ff"], "circle-radius": 22, "circle-blur": 1, "circle-opacity": 0.55 } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
+    paint: { "circle-color": "#ffffff", "circle-radius": 5.5, "circle-stroke-color": "rgba(255,255,255,0.9)", "circle-stroke-width": 2,
+      "circle-stroke-opacity": 0.9, "circle-pitch-alignment": "map" } });
+  map.addLayer({ id: "me-ring", type: "circle", source: "me",
+    paint: { "circle-color": "rgba(0,0,0,0)", "circle-radius": 13, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.6, "circle-stroke-opacity": 0.85 } });
   for (const layer of ["badges", "selected"]) {
     map.on("click", layer, e => select(e.features[0].properties.i, false));
     map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
