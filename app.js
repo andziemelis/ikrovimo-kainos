@@ -85,7 +85,7 @@ const map = new maplibregl.Map({
   container: "map", style: MAP_STYLE, attributionControl: { compact: true },
   // first visit starts from space and flies in; later visits open straight on Lithuania
   ...(firstVisit ? { center: [23.9, 50], zoom: 1.6 } : LITHUANIA),
-  maxPitch: 75, dragRotate: true, touchPitch: true, pitchWithRotate: true,
+  minZoom: 0.6, maxPitch: 85, dragRotate: true, touchPitch: true, pitchWithRotate: true, renderWorldCopies: false,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
 map.on("style.load", () => {
@@ -97,9 +97,28 @@ map.on("style.load", () => {
   nightEarth();
 });
 
+// Cities and towns all over the world glow like lights seen from space, so the whole globe
+// looks alive when zoomed out; they fade away as you zoom in to street level.
+function worldLights() {
+  const src = Object.entries(map.getStyle().sources || {}).find(([, s]) => s.type === "vector");
+  if (!src || map.getLayer("world-lights")) return;
+  const cls = ["match", ["get", "class"], "city", 3, "town", 2, "village", 1, 0];
+  map.addLayer({ id: "world-lights-halo", type: "circle", source: src[0], "source-layer": "place", maxzoom: 10,
+    filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
+    paint: { "circle-color": "#ffc861", "circle-blur": 1,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", cls, 1.6], 6, ["*", cls, 4], 9, ["*", cls, 6]],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 7, 0.3, 9.5, 0] } });
+  map.addLayer({ id: "world-lights", type: "circle", source: src[0], "source-layer": "place", maxzoom: 10,
+    filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
+    paint: { "circle-color": "#fff1c2",
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", cls, 0.35], 6, ["*", cls, 0.8], 9, ["*", cls, 1.1]],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 8, 0.7, 9.5, 0] } });
+}
+
 // "Earth at night" look: deep blue seas, near-black land, faint roads and borders, soft labels.
 function nightEarth() {
   const set = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch {} };
+  worldLights();
   for (const ly of map.getStyle().layers) {
     const sl = ly["source-layer"] || "", id = ly.id;
     if (ly.type === "background") set(id, "background-color", "#040a19");
@@ -253,6 +272,7 @@ function highlight() { if (map.getLayer("selected")) map.setFilter("selected", [
 
 // ---------- station detail ----------
 function select(i, fly = true) {
+  setCollapsed(false);
   selected = i; refreshMap(false);
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
@@ -417,6 +437,7 @@ async function getOrigin() {
 
 // ---------- Best Charge ----------
 async function bestCharge() {
+  setCollapsed(false);
   const t = T(), kwh = +$("kwh").value;
   const origin = await getOrigin();
   if (!origin) return;
@@ -520,11 +541,19 @@ function drawLinks(originPos, targets) {
 let spinning = false;
 function spinStep() {
   if (!spinning) return;
+  if (map.getZoom() >= 3.5) { spinning = false; return; }
   const c = map.getCenter(); c.lng -= 8;
   map.easeTo({ center: c, duration: 1000, easing: t => t, essential: true });
 }
 function startSpin() { if (REDUCED_MOTION) return; spinning = true; spinStep(); }
-function stopSpin() { spinning = false; }
+function stopSpin() { spinning = false; clearTimeout(idleSpin.h); }
+// When you leave the map zoomed out to the whole planet, it starts turning slowly after a few seconds.
+function idleSpin() {
+  clearTimeout(idleSpin.h);
+  if (REDUCED_MOTION) return;
+  idleSpin.h = setTimeout(() => { if (map.getZoom() < 3.5 && !spinning) startSpin(); }, 4000);
+}
+map.on("idle", () => { if (!spinning && map.getZoom() < 3.5) idleSpin(); });
 map.on("moveend", () => { if (spinning) spinStep(); });
 for (const ev of ["mousedown", "touchstart", "wheel", "dragstart"]) map.on(ev, stopSpin);
 function flyIntoLithuania() {
@@ -554,6 +583,19 @@ if (!REDUCED_MOTION) document.addEventListener("pointermove", e => {
   el.style.setProperty("--gx", `${((e.clientX - r.left) / r.width) * 100}%`);
   el.style.setProperty("--gy", `${((e.clientY - r.top) / r.height) * 100}%`);
 }, { passive: true });
+
+// ---------- bottom panel: tuck away to see more map ----------
+const isPhone = () => window.innerWidth < 760;
+function setCollapsed(on) { $("panel").classList.toggle("collapsed", on); $("grab").setAttribute("aria-expanded", String(!on)); }
+$("grab").addEventListener("click", () => setCollapsed(!$("panel").classList.contains("collapsed")));
+// dragging the handle down tucks the panel away; up brings it back
+(() => { let y0 = null;
+  $("grab").addEventListener("pointerdown", e => { y0 = e.clientY; });
+  window.addEventListener("pointerup", e => { if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
+    if (dy > 30) setCollapsed(true); else if (dy < -30) setCollapsed(false); });
+})();
+// when you start exploring the map on a phone, the panel gets out of the way
+map.on("dragstart", () => { if (isPhone()) setCollapsed(true); });
 
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }

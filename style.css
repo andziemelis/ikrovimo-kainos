@@ -286,3 +286,11 @@ select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px 
   radial-gradient(1px 1px at 5% 48%,rgba(255,255,255,.6),transparent 60%),
   radial-gradient(ellipse at 50% 120%,#0b1f4a 0%,#030713 60%) !important;
   background-size:230px 230px,310px 310px,270px 270px,190px 190px,350px 350px,250px 250px,410px 410px,170px 170px,100% 100% !important}
+
+/* collapsible panel */
+.grab{display:block;border:0;cursor:pointer;padding:0;width:48px;height:5px;border-radius:5px;margin:4px auto 10px;position:relative}
+.grab::before{content:"";position:absolute;left:-20px;right:-20px;top:-12px;bottom:-12px}
+.panel{transition:max-height .45s var(--ease,ease),transform .45s var(--ease,ease)}
+.panel.collapsed{max-height:96px!important;overflow:hidden}
+.panel.collapsed #home > :not(.actions),.panel.collapsed #detail > :not(.d-where):not(.amount):not(.x-close){visibility:hidden}
+.panel.collapsed .actions{margin-top:2px}
