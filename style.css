@@ -123,3 +123,20 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .rowline{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .carname{font-size:14px;font-weight:600}
 .secondary.small{padding:8px 12px;font-size:13px;flex:none}
+
+/* glow on the dark theme */
+.go{box-shadow:0 0 0 1px rgba(74,222,128,.25),0 6px 24px rgba(22,163,74,.45)}
+.nav-mini{box-shadow:0 0 14px rgba(22,163,74,.45)}
+.pick.first{box-shadow:0 0 24px rgba(22,163,74,.25)}
+.logo{box-shadow:0 0 16px rgba(22,163,74,.55)}
+
+/* floating stats card */
+.statcard{position:fixed;top:calc(104px + var(--safe-t));left:10px;z-index:5;display:flex;align-items:center;gap:8px;
+  padding:7px 12px;border-radius:12px;background:rgba(15,24,38,.78);border:1px solid var(--line);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px;color:var(--muted);box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.statcard[hidden]{display:none}
+.statcard b{color:var(--ink);font-size:13px}
+.stat-age::before{content:"·";margin-right:8px}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.55)}70%{box-shadow:0 0 0 8px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+@media (prefers-reduced-motion: reduce){.pulse-dot{animation:none}}

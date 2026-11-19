@@ -1,6 +1,7 @@
 // UI text in Lithuanian and English. Numbers and prices are formatted in app.js.
 const I18N = {
   lt: {
+    updatedAgo: m => m < 1 ? "atnaujinta ką tik" : m < 60 ? `atnaujinta prieš ${m} min.` : `atnaujinta prieš ${Math.round(m / 60)} val.`,
     obTitle: "Sveiki atvykę",
     obSub: "Raskite pigiausią elektromobilio įkrovimą Lietuvoje.",
     google: "Tęsti su Google",
@@ -102,6 +103,7 @@ const I18N = {
       <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Automobilių duomenys: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
   },
   en: {
+    updatedAgo: m => m < 1 ? "updated just now" : m < 60 ? `updated ${m} min ago` : `updated ${Math.round(m / 60)} h ago`,
     obTitle: "Welcome",
     obSub: "Find the cheapest place to charge your electric car in Lithuania.",
     google: "Continue with Google",

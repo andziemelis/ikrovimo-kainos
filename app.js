@@ -73,6 +73,8 @@ function priceOf(l, fast = fastOnly) {
 
 // ---------- map ----------
 const LITHUANIA = { center: [23.9, 55.2], zoom: 6.3, pitch: 0, bearing: 0 };
+// People who switched on "reduce motion" on their phone get no spinning, pulsing or long flights.
+const REDUCED_MOTION = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const firstVisit = !store.get("seenGlobe", false);
 const map = new maplibregl.Map({
   container: "map", style: MAP_STYLE, attributionControl: { compact: true },
@@ -128,7 +130,7 @@ function geojson() {
     if (it.mz > z && it.l.i !== selected && !pinned.has(it.l.i)) continue;
     const { l, p } = it, k = levelKey(p);
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] },
-      properties: { i: l.i, rank: it.rank, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
+      properties: { i: l.i, rank: it.rank, c: colourOf(p), known: p == null ? 0 : 1, pin: pinned.has(l.i) || l.i === selected ? 1 : 0, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
         label: p == null ? "" : p === 0 ? T().free : money(p * kwh) } });   // what this charge costs, not €/kWh
   }
   return { type: "FeatureCollection", features };
@@ -172,13 +174,24 @@ async function addLayers() {
       "icon-image": ["get", "icon"],
       "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.42, 9, 0.6, 13, 0.85, 16, 1.05],
       "icon-padding": 2,
-      "icon-allow-overlap": false, "icon-ignore-placement": false,
+      "icon-allow-overlap": true, "icon-ignore-placement": true,
       "symbol-sort-key": ["get", "rank"],
       // prices appear under the markers when zoomed in close; a hidden label never hides its marker
       "text-field": ["step", ["zoom"], "", 12.5, ["get", "label"]],
       "text-font": ["Noto Sans Bold"], "text-size": 12, "text-offset": [0, 1.6], "text-anchor": "top", "text-optional": true,
     },
     paint: { "text-color": "#f1f5f9", "text-halo-color": "#0b1220", "text-halo-width": 1.8 } });
+  // soft glow under each marker in its price colour; stronger for recommended and selected stations
+  map.addLayer({ id: "glow", type: "circle", source: "chargers", filter: ["==", ["get", "known"], 1],
+    paint: { "circle-color": ["get", "c"], "circle-blur": 1,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["case", ["==", ["get", "pin"], 1], 16, 7], 14, ["case", ["==", ["get", "pin"], 1], 34, 18]],
+      "circle-opacity": ["case", ["==", ["get", "pin"], 1], 0.6, 0.28] } }, "badges");
+  // animated "data connection" lines from the start point to the Best Charge results
+  map.addSource("links", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "links-glow", type: "line", source: "links", layout: { "line-cap": "round" },
+    paint: { "line-color": ["get", "c"], "line-width": 10, "line-blur": 8, "line-opacity": 0.45 } }, "glow");
+  map.addLayer({ id: "links", type: "line", source: "links", layout: { "line-cap": "round" },
+    paint: { "line-color": ["get", "c"], "line-width": ["case", ["==", ["get", "best"], 1], 3, 2], "line-opacity": 0.95 } }, "glow");
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
   map.addLayer({ id: "me", type: "circle", source: "me",
@@ -235,7 +248,7 @@ function select(i, fly = true) {
   $("home").hidden = true; $("detail").hidden = false; $("panel").scrollTop = 0;
   $("dNav").onclick = () => navigate(l);
   $("dClose").onclick = closeDetail;
-  if (fly) map.flyTo({ center: [l.lo, l.la], zoom: Math.max(map.getZoom(), 14) });
+  if (fly) cinematicTo(l);
 }
 function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; }
 
@@ -308,6 +321,7 @@ async function bestCharge() {
   const top = [];
   for (const x of paid) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
   pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
+  drawLinks(origin.pos, top.map((x, n) => ({ l: x.l, best: n === 0 })));
   // Kept deliberately short: one total, where, and the saving. The breakdown lives in the station card.
   $("results").innerHTML = `<div class="res-head">${t.resultsHead}</div>` + top.map((x, n) => {
     const saving = nearest.c.total - x.c.total;
@@ -356,6 +370,67 @@ $("carSave").onclick = () => {
 };
 $("carModal").addEventListener("click", e => { if (e.target.id === "carModal") $("carModal").hidden = true; });
 
+// ---------- motion: camera, connection lines, spinning globe ----------
+// Fly to a station with a slight tilt and turn, like Google Earth.
+function cinematicTo(l) {
+  const pad = { bottom: window.innerWidth < 760 ? window.innerHeight * 0.45 : 0, left: window.innerWidth < 760 ? 0 : 400 };
+  if (REDUCED_MOTION) { map.jumpTo({ center: [l.lo, l.la], zoom: Math.max(map.getZoom(), 15), padding: pad }); return; }
+  map.flyTo({ center: [l.lo, l.la], zoom: Math.max(map.getZoom(), 15.2), pitch: 52, bearing: map.getBearing() + 25,
+    padding: pad, duration: 2200, curve: 1.6, essential: true });
+}
+
+// Curved line between two points (a gentle arc instead of a straight ruler line).
+function arc(a, b, steps = 48) {
+  const [x1, y1] = a, [x2, y2] = b, dx = x2 - x1, dy = y2 - y1;
+  const cx = (x1 + x2) / 2 - dy * 0.25, cy = (y1 + y2) / 2 + dx * 0.25 * Math.cos(y1 * Math.PI / 180);
+  const pts = [];
+  for (let i = 0; i <= steps; i++) { const t = i / steps, u = 1 - t; pts.push([u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]); }
+  return pts;
+}
+let linkAnim = 0;
+function drawLinks(originPos, targets) {
+  const src = map.getSource("links"); if (!src) return;
+  const from = [originPos[1], originPos[0]];
+  const lines = targets.map(x => ({ pts: arc(from, [x.l.lo, x.l.la]), c: x.best ? "#4ade80" : "#38bdf8", best: x.best ? 1 : 0 }));
+  const frame = p => src.setData({ type: "FeatureCollection", features: lines.map(L1 => ({ type: "Feature",
+    properties: { c: L1.c, best: L1.best },
+    geometry: { type: "LineString", coordinates: L1.pts.slice(0, Math.max(2, Math.ceil(p * L1.pts.length))) } })) });
+  cancelAnimationFrame(linkAnim);
+  if (REDUCED_MOTION) { frame(1); return; }
+  const t0 = performance.now(), dur = 900;
+  const step = now => { const p = Math.min(1, (now - t0) / dur); frame(1 - (1 - p) ** 3); if (p < 1) linkAnim = requestAnimationFrame(step); };
+  linkAnim = requestAnimationFrame(step);
+}
+
+// Slowly spinning globe behind the welcome screen; stops as soon as the map is touched.
+let spinning = false;
+function spinStep() {
+  if (!spinning) return;
+  const c = map.getCenter(); c.lng -= 8;
+  map.easeTo({ center: c, duration: 1000, easing: t => t, essential: true });
+}
+function startSpin() { if (REDUCED_MOTION) return; spinning = true; spinStep(); }
+function stopSpin() { spinning = false; }
+map.on("moveend", () => { if (spinning) spinStep(); });
+for (const ev of ["mousedown", "touchstart", "wheel", "dragstart"]) map.on(ev, stopSpin);
+function flyIntoLithuania() {
+  stopSpin();
+  if (map.getZoom() > 4) return;
+  if (REDUCED_MOTION) map.jumpTo(LITHUANIA); else map.flyTo({ ...LITHUANIA, duration: 4500, essential: true });
+}
+
+// ---------- floating stats card ----------
+function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
+function updateStats() {
+  if (!DATA) return;
+  const n = L.length, mins = Math.max(0, Math.round((Date.now() - new Date(DATA.pub).getTime()) / 60000));
+  $("statN").textContent = n.toLocaleString(lang === "lt" ? "lt-LT" : "en-GB");
+  $("statLbl").textContent = lang === "lt" ? ltCount(n, "įkrovimo vieta", "įkrovimo vietos", "įkrovimo vietų") : "charging locations";
+  $("statAge").textContent = T().updatedAgo(mins);
+  $("statcard").hidden = false;
+}
+setInterval(updateStats, 60000);
+
 // ---------- welcome screen & car picker ----------
 let CARS = null;
 function loadCars() {
@@ -378,7 +453,7 @@ function openOnboard(changing = false) {
   $("carSearch").value = ""; renderCarList(); loadCars();
   setTimeout(() => $("carSearch").focus(), 50);
 }
-function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) openCar(); }
+function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) openCar(); else flyIntoLithuania(); }
 function setKwhOptions() {
   const prev = $("kwh").value, opts = [20, 40, 60].map(k => `<option value="${k}">${k} kWh</option>`);
   let auto = null;
@@ -433,7 +508,7 @@ function applyLang() {
   $("origin").value = store.get("origin", homeLoc ? "home" : "me");
   $("infoBody").innerHTML = T().about + `<button class="secondary" id="infoClose">${T().close}</button>`;
   $("infoClose").onclick = () => $("infoModal").hidden = true;
-  setUpdated();
+  setUpdated(); updateStats();
   if (L.length) { refreshMap(); if (selected != null) select(selected, false); if ($("results").innerHTML) bestCharge(); }
 }
 function setUpdated() {
@@ -459,9 +534,12 @@ const dataReady = fetch(DATA_URL, { cache: "no-cache" }).then(r => { if (!r.ok) 
   const ct = c => [(c & 1) && "Type 2", (c & 2) && "CCS", (c & 4) && "CHAdeMO"].filter(Boolean).join(", ") || "—";
   L = d.s.map(([la, lo, kw, n, c, offers], i) => ({ i, la, lo, kw, n, ctb: c, ctxt: ct(c),
     offers: offers.map(([op, m, ac, dc, fl, tt]) => ({ op: d.ops[op], m: (fl & 1) ? 0 : m, ac, dc, f: fl & 1, fo: fl & 2, pk: fl & 4, fx: fl & 8, t: tt.map(j => d.T[j]) })) }));
-  setUpdated();
+  setUpdated(); updateStats();
 }).catch(() => toast(T().loadFail, 8000));
 map.on("load", () => {
   dataReady.then(addLayers);
-  if (firstVisit) { store.set("seenGlobe", true); setTimeout(() => map.flyTo({ ...LITHUANIA, duration: 4500, essential: true }), 600); }
+  if (firstVisit) {
+    store.set("seenGlobe", true);
+    if (!$("onboard").hidden) startSpin(); else setTimeout(flyIntoLithuania, 600);
+  }
 });
