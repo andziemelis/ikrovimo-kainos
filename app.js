@@ -69,7 +69,6 @@ map.on("style.load", () => {
 // Price level of a location, used for both the colour and the marker icon.
 const levelKey = p => p == null ? "unk" : p === 0 ? "free" : p <= 0.29 ? "cheap" : p <= 0.37 ? "mid" : "high";
 const LEVEL_COLOURS = { free: "#0ea5e9", cheap: "#16a34a", mid: "#f59e0b", high: "#dc2626", unk: "#94a3b8" };
-const BADGE_ZOOM = 9.5; // below this, plain dots; from here on, charger badges
 
 function geojson() {
   const features = [];
@@ -78,8 +77,11 @@ function geojson() {
     const { p } = priceOf(l);
     if (hideUnknown && p == null) continue;
     const k = levelKey(p);
+    // Placement priority when zoomed out (lower = shown first): stations with a known low price,
+    // fast chargers and bigger sites win; others appear as you zoom in and space frees up.
+    const rank = (p == null ? 1000 : p === 0 ? 60 : p * 100) - (isFast(l) ? 8 : 0) - Math.min(l.n, 8);
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] },
-      properties: { i: l.i, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
+      properties: { i: l.i, rank, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
         label: p == null ? "" : p === 0 ? T().free : money(p) } });
   }
   return { type: "FeatureCollection", features };
@@ -115,25 +117,25 @@ async function addLayers() {
   await loadBadges();
   map.addSource("chargers", { type: "geojson", data: geojson() });
   map.addSource("me", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "chargers", type: "circle", source: "chargers", maxzoom: BADGE_ZOOM,
-    paint: {
-      "circle-color": ["get", "c"],
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 3, 9.5, 4.5],
-      "circle-stroke-color": "#0b1220", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 9.5, 1.2],
-      "circle-sort-key": ["get", "known"],
-    } });
-  map.addLayer({ id: "badges", type: "symbol", source: "chargers", minzoom: BADGE_ZOOM,
-    layout: { "icon-image": ["get", "icon"], "icon-size": ["interpolate", ["linear"], ["zoom"], 9.5, 0.7, 13, 0.9, 16, 1.05],
-      "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "known"] } });
-  map.addLayer({ id: "labels", type: "symbol", source: "chargers", minzoom: 12.5, filter: ["==", ["get", "known"], 1],
-    layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12,
-      "text-offset": [0, 1.7], "text-anchor": "top", "text-allow-overlap": false },
+  // One marker layer for every zoom. Markers that would overlap are hidden (collision detection),
+  // so the map shows a few of the best stations from far away and more as you zoom in.
+  map.addLayer({ id: "badges", type: "symbol", source: "chargers",
+    layout: {
+      "icon-image": ["get", "icon"],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.42, 9, 0.6, 13, 0.85, 16, 1.05],
+      "icon-padding": ["interpolate", ["linear"], ["zoom"], 5, 6, 10, 3, 14, 1],
+      "icon-allow-overlap": false, "icon-ignore-placement": false,
+      "symbol-sort-key": ["get", "rank"],
+      // prices appear under the markers when zoomed in close; a hidden label never hides its marker
+      "text-field": ["step", ["zoom"], "", 12.5, ["get", "label"]],
+      "text-font": ["Noto Sans Bold"], "text-size": 12, "text-offset": [0, 1.6], "text-anchor": "top", "text-optional": true,
+    },
     paint: { "text-color": "#f1f5f9", "text-halo-color": "#0b1220", "text-halo-width": 1.8 } });
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
   map.addLayer({ id: "me", type: "circle", source: "me",
     paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
-  for (const layer of ["chargers", "badges"]) {
+  for (const layer of ["badges", "selected"]) {
     map.on("click", layer, e => select(e.features[0].properties.i, false));
     map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
     map.on("mouseleave", layer, () => map.getCanvas().style.cursor = "");
