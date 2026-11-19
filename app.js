@@ -102,13 +102,14 @@ function buildLod() {
 
 function geojson() {
   const z = Math.max(LOD_MIN, Math.floor(map.getZoom()));
+  const kwh = +$("kwh").value;
   const features = [];
   for (const it of lodItems) {
     if (it.mz > z && it.l.i !== selected && !pinned.has(it.l.i)) continue;
     const { l, p } = it, k = levelKey(p);
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] },
       properties: { i: l.i, rank: it.rank, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
-        label: p == null ? "" : p === 0 ? T().free : money(p) } });
+        label: p == null ? "" : p === 0 ? T().free : money(p * kwh) } });   // what this charge costs, not €/kWh
   }
   return { type: "FeatureCollection", features };
 }
@@ -355,7 +356,7 @@ $("fastChip").onclick = () => { fastOnly = !fastOnly; store.set("fastOnly", fast
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = bestCharge;
 $("origin").onchange = () => { store.set("origin", $("origin").value); bestCharge(); };
-$("kwh").onchange = () => { if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
+$("kwh").onchange = () => { refreshMap(false); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
 applyLang(); setChips();
