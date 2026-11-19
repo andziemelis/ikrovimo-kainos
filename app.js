@@ -70,18 +70,44 @@ map.on("style.load", () => {
 const levelKey = p => p == null ? "unk" : p === 0 ? "free" : p <= 0.29 ? "cheap" : p <= 0.37 ? "mid" : "high";
 const LEVEL_COLOURS = { free: "#0ea5e9", cheap: "#16a34a", mid: "#f59e0b", high: "#dc2626", unk: "#94a3b8" };
 
-function geojson() {
-  const features = [];
+// ---------- level of detail ----------
+// From far away only a few of the best stations are shown; more appear with every zoom step.
+// The map is split into a grid of cells about CELL_PX(z) pixels wide and each cell shows at most
+// one station, the best-ranked one. Stations keep the zoom at which they first appear (mz),
+// so nothing disappears while zooming in.
+const LOD_MIN = 5, LOD_MAX = 15;                       // from LOD_MAX on, every station shows
+const CELL_PX = z => z <= 7 ? 95 : z <= 9 ? 90 : z <= 11 ? 75 : z <= 13 ? 55 : 40;
+const mercX = lon => (lon + 180) / 360;
+const mercY = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2; };
+let lodItems = [], lodLevel = null, pinned = new Set(); // pinned: Best Charge results, always shown
+
+function buildLod() {
+  lodItems = [];
   for (const l of L) {
     if (fastOnly && !isFast(l)) continue;
     const { p } = priceOf(l);
     if (hideUnknown && p == null) continue;
-    const k = levelKey(p);
-    // Placement priority when zoomed out (lower = shown first): stations with a known low price,
-    // fast chargers and bigger sites win; others appear as you zoom in and space frees up.
+    // lower rank = more important: known low price first, then fast chargers and bigger sites
     const rank = (p == null ? 1000 : p === 0 ? 60 : p * 100) - (isFast(l) ? 8 : 0) - Math.min(l.n, 8);
+    lodItems.push({ l, p, rank, x: mercX(l.lo), y: mercY(l.la), mz: LOD_MAX });
+  }
+  lodItems.sort((a, b) => a.rank - b.rank);
+  for (let z = LOD_MIN; z < LOD_MAX; z++) {
+    const size = CELL_PX(z) / (256 * 2 ** z), taken = new Set();
+    const cell = it => Math.floor(it.x / size) + ":" + Math.floor(it.y / size);
+    for (const it of lodItems) if (it.mz <= z) taken.add(cell(it));      // already visible keep their cells
+    for (const it of lodItems) if (it.mz > z) { const c = cell(it); if (!taken.has(c)) { taken.add(c); it.mz = z; } }
+  }
+}
+
+function geojson() {
+  const z = Math.max(LOD_MIN, Math.floor(map.getZoom()));
+  const features = [];
+  for (const it of lodItems) {
+    if (it.mz > z && it.l.i !== selected && !pinned.has(it.l.i)) continue;
+    const { l, p } = it, k = levelKey(p);
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] },
-      properties: { i: l.i, rank, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
+      properties: { i: l.i, rank: it.rank, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
         label: p == null ? "" : p === 0 ? T().free : money(p) } });
   }
   return { type: "FeatureCollection", features };
@@ -115,6 +141,7 @@ function loadBadges() {
 
 async function addLayers() {
   await loadBadges();
+  buildLod(); lodLevel = Math.floor(map.getZoom());
   map.addSource("chargers", { type: "geojson", data: geojson() });
   map.addSource("me", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   // One marker layer for every zoom. Markers that would overlap are hidden (collision detection),
@@ -123,7 +150,7 @@ async function addLayers() {
     layout: {
       "icon-image": ["get", "icon"],
       "icon-size": ["interpolate", ["linear"], ["zoom"], 5, 0.42, 9, 0.6, 13, 0.85, 16, 1.05],
-      "icon-padding": ["interpolate", ["linear"], ["zoom"], 5, 6, 10, 3, 14, 1],
+      "icon-padding": 2,
       "icon-allow-overlap": false, "icon-ignore-placement": false,
       "symbol-sort-key": ["get", "rank"],
       // prices appear under the markers when zoomed in close; a hidden label never hides its marker
@@ -141,12 +168,13 @@ async function addLayers() {
     map.on("mouseleave", layer, () => map.getCanvas().style.cursor = "");
   }
 }
-function refreshMap() { const s = map.getSource("chargers"); if (s) s.setData(geojson()); highlight(); }
+function refreshMap(rebuild = true) { if (rebuild) buildLod(); const s = map.getSource("chargers"); if (s) s.setData(geojson()); highlight(); }
+map.on("zoom", () => { const z = Math.floor(map.getZoom()); if (z !== lodLevel && map.getSource("chargers")) { lodLevel = z; refreshMap(false); } });
 function highlight() { if (map.getLayer("selected")) map.setFilter("selected", ["==", ["get", "i"], selected ?? -1]); }
 
 // ---------- station detail ----------
 function select(i, fly = true) {
-  selected = i; highlight();
+  selected = i; refreshMap(false);
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
   const priced = l.offers.filter(x => x.m != null).length;
@@ -185,7 +213,7 @@ function select(i, fly = true) {
   $("dClose").onclick = closeDetail;
   if (fly) map.flyTo({ center: [l.lo, l.la], zoom: Math.max(map.getZoom(), 14) });
 }
-function closeDetail() { selected = null; highlight(); $("detail").hidden = true; $("home").hidden = false; }
+function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; }
 
 // ---------- navigation hand-off ----------
 function navigate(l) {
@@ -255,6 +283,7 @@ async function bestCharge() {
   paid.sort((a, b) => a.c.total - b.c.total);
   const top = [];
   for (const x of paid) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
+  pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
   $("results").innerHTML = `<div class="res-head">${t.resultsFrom(origin.label, kwh)}</div>` + top.map(x => {
     const saving = nearest.c.total - x.c.total;
     const badge = x === nearest ? `<span class="save">${t.isNearest}</span>` : saving > 0.2 ? `<span class="save">${t.vsNearest(money(saving))}</span>` : "";
