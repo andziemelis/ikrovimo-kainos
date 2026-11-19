@@ -7,6 +7,8 @@ A mobile-first website that shows electric-car charging prices across Lithuania 
 - Map view: 3D globe (spin, tilt and rotate with two fingers)
 - Ranking: total cost = charge + trip there and back (electricity, car wear, your time), from your location, a saved home or a city
 - Navigation: hands off to Google Maps, Waze or Apple Maps
+- Car picker: connectors, charging speed and consumption from [Open EV Data](https://github.com/KilowattApp/open-ev-data) (MIT with attribution; licence in `data/OPEN-EV-DATA-LICENSE`)
+- Optional sign-in with Google or Apple through Firebase Auth (off until configured)
 - Languages: Lithuanian and English
 - No backend, no accounts, no cookies: it's a static site
 
@@ -29,6 +31,21 @@ A mobile-first website that shows electric-car charging prices across Lithuania 
 5. The site appears at `https://<your-user>.github.io/<repository>/` after a minute or two.
 
 A custom domain (for example a `.lt` name) can be added later under **Settings → Pages → Custom domain**.
+
+## Turn on sign-in (Google / Apple)
+
+1. Create a free project at [console.firebase.google.com](https://console.firebase.google.com) and add a **Web app**. Copy its config object.
+2. **Authentication → Sign-in method**: enable **Google**. For **Apple**, a paid Apple Developer account is needed.
+3. **Authentication → Settings → Authorized domains**: add `andziemelis.github.io` (and your own domain later).
+4. Paste the config into `FIREBASE_CONFIG` at the top of `app.js`. The sign-in buttons then appear on the welcome screen.
+
+Sign-in is optional: people can always continue without an account.
+
+## Update the car list
+
+```bash
+python scripts/build_cars.py path/to/open-ev-data/data/ev-data.json
+```
 
 ## Update the data by hand
 

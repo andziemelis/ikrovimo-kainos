@@ -1,6 +1,29 @@
 // UI text in Lithuanian and English. Numbers and prices are formatted in app.js.
 const I18N = {
   lt: {
+    obTitle: "Sveiki atvykę",
+    obSub: "Raskite pigiausią elektromobilio įkrovimą Lietuvoje.",
+    google: "Tęsti su Google",
+    apple: "Tęsti su Apple",
+    or: "arba",
+    carQ: "Koks jūsų automobilis?",
+    carWhy: "Pagal automobilį parinksime tinkamas jungtis, įkrovimo galią ir sąnaudas. Galite praleisti.",
+    carSearchPh: "Ieškoti, pvz. Tesla Model 3",
+    carNotFound: "Nerasta. Pabandykite trumpesnį pavadinimą.",
+    skip: "Praleisti",
+    fastUpTo: "greitasis iki",
+    carSaved: "Automobilis išsaugotas",
+    carNone: "Nepasirinktas",
+    change: "Keisti",
+    carSection: "Automobilis",
+    accountSection: "Paskyra",
+    signedInAs: n => `Prisijungta: ${n}`,
+    signOut: "Atsijungti",
+    signInFailed: "Nepavyko prisijungti. Bandykite dar kartą.",
+    autoKwh: k => `${k} kWh (10→80 %)`,
+    chargeTime: (m, kw) => `Įkrovimas apie ${m} min. (iki ${kw} kW)`,
+    chargeTimeCar: (m, kw) => `Jūsų automobiliui įkrovimas apie ${m} min. (iki ${kw} kW)`,
+    dcIncompatible: "Jūsų automobilis čia negali naudoti greitojo įkrovimo (netinka jungtis), todėl rodoma lėto įkrovimo kaina.",
     fromLbl: "Iš:",
     resultsHead: "Geriausi variantai · kaina su kelione",
     saves: a => `sutaupote ${a}`,
@@ -76,9 +99,32 @@ const I18N = {
       <p><b>Kainos</b> – tai operatorių paskelbti tarifai iš Lietuvos nacionalinės įkrovimo prieigų duomenų bazės. Jei vietoje skelbiamos kelios kainos, rodoma mažiausia, todėl tikroji kaina gali būti didesnė, priklausomai nuo įkroviklio, mokėjimo būdo ar narystės. Kainos yra orientacinės.</p>
       <p>Duomenų bazėje yra ir viešos, ir pusiau viešos (pvz., biurų ar gyvenamųjų namų aikštelių) prieigos, todėl kai kurios labai pigios ar nemokamos vietos gali būti prieinamos ne visiems.</p>
       <p><b>Privatumas:</b> jūsų buvimo vieta naudojama tik jūsų įrenginyje ir niekur nesiunčiama. Namų vieta ir automobilio nustatymai saugomi tik šiame įrenginyje.</p><p><b>Kaip skaičiuojama:</b> lyginama visa kaina – įkrovimas plius kelionė pirmyn ir atgal (elektra, automobilio dėvėjimasis ir jūsų laikas). Atstumas vertinamas apytiksliai (tiesi linija × 1,3).</p>
-      <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
+      <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Automobilių duomenys: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
   },
   en: {
+    obTitle: "Welcome",
+    obSub: "Find the cheapest place to charge your electric car in Lithuania.",
+    google: "Continue with Google",
+    apple: "Continue with Apple",
+    or: "or",
+    carQ: "Which car do you drive?",
+    carWhy: "We'll match the right connectors, charging speed and consumption. You can skip this.",
+    carSearchPh: "Search, e.g. Tesla Model 3",
+    carNotFound: "No match. Try a shorter name.",
+    skip: "Skip",
+    fastUpTo: "fast up to",
+    carSaved: "Car saved",
+    carNone: "Not selected",
+    change: "Change",
+    carSection: "Car",
+    accountSection: "Account",
+    signedInAs: n => `Signed in as ${n}`,
+    signOut: "Sign out",
+    signInFailed: "Sign-in didn't work. Please try again.",
+    autoKwh: k => `${k} kWh (10→80%)`,
+    chargeTime: (m, kw) => `Charging takes about ${m} min (up to ${kw} kW)`,
+    chargeTimeCar: (m, kw) => `About ${m} min for your car (up to ${kw} kW)`,
+    dcIncompatible: "Your car can't fast-charge here (connector doesn't fit), so the slow-charging price is shown.",
     fromLbl: "From:",
     resultsHead: "Best options · price includes the trip",
     saves: a => `saves ${a}`,
@@ -154,6 +200,6 @@ const I18N = {
       <p><b>Prices</b> are the operators' own published tariffs from Lithuania's national charging database. Where a location lists several prices, the lowest is shown, so the real price can be higher depending on the charger, payment method or membership. Treat prices as estimates.</p>
       <p>The database covers both public and semi-public chargers (for example in office or residential car parks), so some very cheap or free spots may only be open to certain users.</p>
       <p><b>Privacy:</b> your location is only used on your device and is never sent anywhere. Your home location and car settings are saved on this device only.</p><p><b>How it ranks:</b> by total cost, meaning the charge plus the trip there and back (electricity, car wear and your time). Distances are estimated (straight line × 1.3).</p>
-      <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
+      <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Car data: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
   }
 };

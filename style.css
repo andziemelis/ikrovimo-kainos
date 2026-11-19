@@ -102,3 +102,24 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .pick.first{border-color:#16a34a;background:rgba(22,163,74,.10)}
 .pick.first .amt{color:#4ade80}
 .legend[hidden]{display:none}
+
+/* onboarding & car picker */
+.onboard{position:fixed;inset:0;z-index:40;background:rgba(5,8,15,.92);display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:calc(24px + var(--safe-t)) 14px calc(24px + var(--safe-b))}
+.onboard[hidden]{display:none}
+.ob-card{width:100%;max-width:440px;background:var(--bg);border:1px solid var(--line);border-radius:22px;padding:22px 18px;display:flex;flex-direction:column;gap:10px}
+.ob-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:6px}
+.ob-head h2{margin:6px 0 0;font-size:22px}
+.logo.big{width:52px;height:52px;border-radius:14px}
+.ob-card h3{margin:8px 0 0;font-size:16px}
+.authbtn{width:100%;padding:14px;border-radius:14px;border:1px solid var(--line);background:#f8fafc;color:#0b1220;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:4px 0}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+#carSearch{width:100%;padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:var(--soft);color:var(--ink);font-size:16px;font-family:inherit}
+.carlist{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow-y:auto}
+.caropt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;cursor:pointer}
+.caropt b{font-size:14px}
+.caropt span{font-size:12px;color:var(--muted)}
+.caropt:hover,.caropt:focus{border-color:#16a34a;outline:none}
+.rowline{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.carname{font-size:14px;font-weight:600}
+.secondary.small{padding:8px 12px;font-size:13px;flex:none}

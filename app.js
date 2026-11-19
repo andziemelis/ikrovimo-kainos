@@ -1,5 +1,7 @@
 "use strict";
 // ---------- config ----------
+// Sign-in with Google / Apple. Paste the Firebase web config here to switch it on (see README).
+const FIREBASE_CONFIG = null;
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const DATA_URL = "data/lt.json";
 const SEARCH_KM = 25;          // look this far (straight line); the cost model decides what is worth it
@@ -43,8 +45,26 @@ let L = [], DATA = null, selected = null, userPos = null, lastOrigin = null;
 let homeLoc = store.get("home", null);              // [lat, lon] or null
 let car = { ...CAR_DEFAULTS, ...store.get("car", {}) };
 let fastOnly = store.get("fastOnly", false), hideUnknown = store.get("hideUnknown", false);
-const isFast = l => l.kw > 22;
-function offerPrice(o, l, fast) { if (fast) { if (o.dc != null) return o.dc; return l.kw > 22 ? o.m : null; } return o.m; }
+// ---------- the driver's car (optional) ----------
+// row from data/cars.json: [brand, model, variant, year, battery kWh, kWh/100 km, AC max kW, DC max kW, ports]
+let myCar = store.get("myCar", null);
+const carLabel = c => [c[0], c[1], c[2]].filter(Boolean).join(" ") + (c[3] ? ` (${c[3]})` : "");
+// Can this car fast-charge here? ports: 1 = CCS, 2 = CHAdeMO; station ct: 2 = CCS, 4 = CHAdeMO
+const carFitsDC = l => !myCar || ((myCar[8] & 1) && (l.ctb & 2)) || ((myCar[8] & 2) && (l.ctb & 4));
+const isFast = l => l.kw > 22 && carFitsDC(l);
+function offerPrice(o, l, fast) {
+  if (fast) { if (!isFast(l)) return null; if (o.dc != null) return o.dc; return o.m; }
+  if (l.kw > 22 && !carFitsDC(l)) return o.ac;   // the car can only use the slow (AC) side here
+  return o.m;
+}
+// Effective charging power and time for this car at this station.
+function chargeTime(l, kwh) {
+  const fast = isFast(l);
+  let kw = fast ? l.kw : Math.min(l.kw, 22);
+  if (myCar) kw = Math.min(kw, fast ? (myCar[7] || kw) : (myCar[6] || 11));
+  const avg = fast ? kw * 0.7 : kw;                // fast charging slows down as the battery fills
+  return { kw: Math.round(kw), min: Math.round(kwh / Math.max(avg, 1) * 60 / 5) * 5 };
+}
 function priceOf(l, fast = fastOnly) {
   let best = null, offer = null;
   for (const o of l.offers) { const p = offerPrice(o, l, fast); if (p != null && (best == null || p < best)) { best = p; offer = o; } }
@@ -180,6 +200,9 @@ function select(i, fly = true) {
   const { p, o } = priceOf(l);
   const priced = l.offers.filter(x => x.m != null).length;
   let total = p == null ? t.noPriceLong : p === 0 ? t.freeToCharge : t.forKwh(money(p * kwh), kwh, Math.round(kwh / car.cons * 100));
+  const ct = chargeTime(l, kwh);
+  total += `<div class="breakdown">${myCar ? t.chargeTimeCar(ct.min, ct.kw) : t.chargeTime(ct.min, ct.kw)}</div>`;
+  if (myCar && l.kw > 22 && !carFitsDC(l)) total += `<div class="breakdown">${t.dcIncompatible}</div>`;
   if (p != null && p > 0 && lastOrigin) {
     const c = tripCost(km(lastOrigin.pos[0], lastOrigin.pos[1], l.la, l.lo), p, kwh);
     total += `<div class="breakdown">${t.detailTrip(lastOrigin.label, Math.round(c.road * 10) / 10, money(c.trip), money(c.total))}</div>`;
@@ -308,6 +331,9 @@ async function bestCharge() {
 // ---------- home & car settings ----------
 function openCar() {
   const t = T();
+  $("carName").textContent = myCar ? carLabel(myCar) : t.carNone;
+  $("acctBox").hidden = !authUser;
+  if (authUser) $("acctName").textContent = t.signedInAs(authUser.displayName || authUser.email || "");
   $("homeStatus").textContent = homeLoc ? t.homeSet(townOf({ la: homeLoc[0], lo: homeLoc[1] })) : t.homeNotSet;
   $("homeClear").hidden = !homeLoc;
   $("cons").value = car.cons; $("wear").value = car.wear; $("timeVal").value = car.timeVal;
@@ -330,11 +356,78 @@ $("carSave").onclick = () => {
 };
 $("carModal").addEventListener("click", e => { if (e.target.id === "carModal") $("carModal").hidden = true; });
 
+// ---------- welcome screen & car picker ----------
+let CARS = null;
+function loadCars() {
+  if (!CARS) CARS = fetch("data/cars.json").then(r => r.json()).then(d => d.cars).catch(() => []);
+  return CARS;
+}
+async function renderCarList() {
+  const cars = await loadCars(), t = T();
+  const terms = $("carSearch").value.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = terms.length ? cars.filter(c => { const s = `${c[0]} ${c[1]} ${c[2]} ${c[3] || ""}`.toLowerCase(); return terms.every(w => s.includes(w)); }) : [];
+  $("carList").innerHTML = hits.slice(0, 40).map(c => {
+    const i = cars.indexOf(c);
+    const specs = [c[4] && `${c[4]} kWh`, c[7] && `${t.fastUpTo} ${c[7]} kW`, (c[8] & 2) && !(c[8] & 1) ? "CHAdeMO" : ""].filter(Boolean).join(" · ");
+    return `<button class="caropt" role="listitem" data-car="${i}"><b>${carLabel(c)}</b><span>${specs}</span></button>`;
+  }).join("") || (terms.length ? `<div class="note">${t.carNotFound}</div>` : "");
+}
+function openOnboard(changing = false) {
+  $("onboard").hidden = false; $("onboard").dataset.changing = changing ? "1" : "";
+  $("obAuth").hidden = !FIREBASE_CONFIG || !!authUser || changing;
+  $("carSearch").value = ""; renderCarList(); loadCars();
+  setTimeout(() => $("carSearch").focus(), 50);
+}
+function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) openCar(); }
+function setKwhOptions() {
+  const prev = $("kwh").value, opts = [20, 40, 60].map(k => `<option value="${k}">${k} kWh</option>`);
+  let auto = null;
+  if (myCar && myCar[4]) { auto = Math.round(myCar[4] * 0.7); opts.unshift(`<option value="${auto}">${T().autoKwh(auto)}</option>`); }
+  $("kwh").innerHTML = opts.join("");
+  $("kwh").value = auto && (!prev || store.get("kwhAuto", true)) ? String(auto) : (prev || "40");
+  if (!$("kwh").value) $("kwh").value = "40";
+}
+$("carSearch").addEventListener("input", renderCarList);
+$("carList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-car]"); if (!b) return;
+  const c = (await loadCars())[+b.dataset.car];
+  myCar = c; store.set("myCar", c);
+  if (c[5]) { car = { ...car, cons: c[5] }; store.set("car", car); }
+  store.set("kwhAuto", true); setKwhOptions(); refreshMap(); toast(T().carSaved);
+  if ($("results").innerHTML) bestCharge();
+  finishOnboard();
+});
+$("carSkip").onclick = finishOnboard;
+$("carChange").onclick = () => { $("carModal").hidden = true; openOnboard(true); };
+
+// ---------- sign-in (Firebase Auth; only active when FIREBASE_CONFIG is set) ----------
+let authUser = null;
+function loadScript(src) { return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+async function initAuth() {
+  if (!FIREBASE_CONFIG) return;
+  try {
+    await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js");
+    firebase.initializeApp(FIREBASE_CONFIG);
+    firebase.auth().onAuthStateChanged(u => { authUser = u; if (u && !$("onboard").hidden) $("obAuth").hidden = true; });
+  } catch (e) { console.warn("Sign-in unavailable", e); }
+}
+async function signIn(provider) {
+  try { const r = await firebase.auth().signInWithPopup(provider); authUser = r.user; $("obAuth").hidden = true; toast(T().signedInAs(authUser.displayName || authUser.email || "")); }
+  catch (e) { if (e && e.code !== "auth/popup-closed-by-user") toast(T().signInFailed); }
+}
+$("authGoogle").onclick = () => signIn(new firebase.auth.GoogleAuthProvider());
+$("authApple").onclick = () => signIn(new firebase.auth.OAuthProvider("apple.com"));
+$("signOut").onclick = async () => { try { await firebase.auth().signOut(); } catch {} authUser = null; openCar(); };
+
 // ---------- UI wiring ----------
 function applyLang() {
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = T()[el.dataset.t]);
   $("langBtn").textContent = lang === "lt" ? "EN" : "LT";
+  $("carSearch").placeholder = T().carSearchPh;
+  if ($("kwh").options.length) setKwhOptions();
+  if (!$("onboard").hidden) renderCarList();
   $("origin").innerHTML = `<option value="me">${T().originMe}</option><option value="home">${T().originHome}</option>` +
     CITIES.map(c => `<option value="${c.id}">${c.en}</option>`).join("");
   $("origin").value = store.get("origin", homeLoc ? "home" : "me");
@@ -356,14 +449,15 @@ $("fastChip").onclick = () => { fastOnly = !fastOnly; store.set("fastOnly", fast
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = bestCharge;
 $("origin").onchange = () => { store.set("origin", $("origin").value); bestCharge(); };
-$("kwh").onchange = () => { refreshMap(false); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
+$("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
-applyLang(); setChips();
+applyLang(); setChips(); setKwhOptions(); initAuth();
+if (!store.get("onboarded", false)) openOnboard();
 const dataReady = fetch(DATA_URL, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
   DATA = d;
   const ct = c => [(c & 1) && "Type 2", (c & 2) && "CCS", (c & 4) && "CHAdeMO"].filter(Boolean).join(", ") || "—";
-  L = d.s.map(([la, lo, kw, n, c, offers], i) => ({ i, la, lo, kw, n, ctxt: ct(c),
+  L = d.s.map(([la, lo, kw, n, c, offers], i) => ({ i, la, lo, kw, n, ctb: c, ctxt: ct(c),
     offers: offers.map(([op, m, ac, dc, fl, tt]) => ({ op: d.ops[op], m: (fl & 1) ? 0 : m, ac, dc, f: fl & 1, fo: fl & 2, pk: fl & 4, fx: fl & 8, t: tt.map(j => d.T[j]) })) }));
   setUpdated();
 }).catch(() => toast(T().loadFail, 8000));

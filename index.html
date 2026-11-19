@@ -73,7 +73,13 @@
 
 <div class="modal" id="carModal" hidden>
   <div class="sheet">
-    <h3 data-t="homeTitle"></h3>
+    <div id="acctBox" hidden>
+      <h3 data-t="accountSection"></h3>
+      <div class="rowline"><span class="note" id="acctName"></span><button class="linkbtn" id="signOut" data-t="signOut"></button></div>
+    </div>
+    <h3 data-t="carSection"></h3>
+    <div class="rowline"><span id="carName" class="carname"></span><button class="secondary small" id="carChange" data-t="change"></button></div>
+    <h3 data-t="homeTitle" style="margin-top:12px"></h3>
     <div class="note" id="homeStatus"></div>
     <div class="btnrow">
       <button class="secondary" id="homeHere" data-t="homeUseLoc"></button>
@@ -86,6 +92,26 @@
     <label class="field"><span data-t="wearLbl"></span><input type="number" id="wear" min="0" max="0.5" step="0.01" inputmode="decimal"><em>€/km</em></label>
     <label class="field"><span data-t="timeLbl"></span><input type="number" id="timeVal" min="0" max="100" step="1" inputmode="decimal"><em>€/h</em></label>
     <button class="go" id="carSave" data-t="saveBtn"></button>
+  </div>
+</div>
+
+<div class="onboard" id="onboard" hidden>
+  <div class="ob-card">
+    <div class="ob-head">
+      <span class="logo big"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M13.5 2 5 13.5h6L9.5 22 19 9.5h-6.2z" fill="currentColor"/></svg></span>
+      <h2 data-t="obTitle"></h2>
+      <p class="note" data-t="obSub"></p>
+    </div>
+    <div id="obAuth" hidden>
+      <button class="authbtn" id="authGoogle" data-t="google"></button>
+      <button class="authbtn" id="authApple" data-t="apple"></button>
+      <div class="or"><span data-t="or"></span></div>
+    </div>
+    <h3 data-t="carQ"></h3>
+    <p class="note" data-t="carWhy"></p>
+    <input id="carSearch" type="search" autocomplete="off" aria-label="Car">
+    <div id="carList" class="carlist" role="list"></div>
+    <button class="secondary" id="carSkip" data-t="skip"></button>
   </div>
 </div>
 
