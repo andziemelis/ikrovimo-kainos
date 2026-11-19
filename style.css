@@ -1,6 +1,6 @@
 :root{
   --free:#0ea5e9; --cheap:#16a34a; --mid:#f59e0b; --high:#dc2626; --unk:#94a3b8;
-  --ink:#e8eef6; --muted:#8b9bb0; --line:#243246; --bg:#0f1826; --soft:#1a2638; --card:#141f30; --brand:#6d28d9; --brand2:#4338ca; --accent:#a78bfa; --glow:rgba(124,58,237,.5); --space:#05080f;
+  --ink:#e8eef6; --muted:#8b9bb0; --line:#243246; --bg:#0f1826; --soft:#1a2638; --card:#141f30; --brand:#3156ff; --brand2:#2a33d9; --accent:#9db8ff; --glow:rgba(61,107,255,.5); --space:#05080f;
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
 *{box-sizing:border-box}
@@ -35,7 +35,7 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .pick .amt{font-size:20px;font-weight:800;min-width:72px}
 .pick .meta{flex:1;font-size:13px;color:var(--muted);line-height:1.35}
 .pick .meta b{color:var(--ink)}
-.save{display:inline-block;margin-top:3px;background:rgba(124,58,237,.18);color:#c4b5fd;font-weight:700;font-size:12px;border-radius:6px;padding:1px 6px}
+.save{display:inline-block;margin-top:3px;background:rgba(61,107,255,.18);color:#bcd0ff;font-weight:700;font-size:12px;border-radius:6px;padding:1px 6px}
 .nav-mini{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border:0;border-radius:10px;padding:9px;display:grid;place-items:center;font-weight:700;font-size:13px;cursor:pointer}
 .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
 
@@ -98,9 +98,9 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .pick .amt{font-size:22px;font-weight:800;min-width:84px;color:var(--ink)}
 .pick .meta{display:flex;flex-direction:column;gap:2px;font-size:13px}
 .pick .meta b{font-size:15px}
-.pick .meta em{font-style:normal;color:#c4b5fd;font-weight:600}
-.pick.first{border-color:#7c3aed;background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(67,56,202,.10))}
-.pick.first .amt{color:#c4b5fd}
+.pick .meta em{font-style:normal;color:#bcd0ff;font-weight:600}
+.pick.first{border-color:#3d6bff;background:linear-gradient(135deg,rgba(49,86,255,.18),rgba(42,51,217,.10))}
+.pick.first .amt{color:#bcd0ff}
 .legend[hidden]{display:none}
 
 /* onboarding & car picker */
@@ -119,15 +119,15 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .caropt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;cursor:pointer}
 .caropt b{font-size:14px}
 .caropt span{font-size:12px;color:var(--muted)}
-.caropt:hover,.caropt:focus{border-color:#7c3aed;outline:none}
+.caropt:hover,.caropt:focus{border-color:#3d6bff;outline:none}
 .rowline{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .carname{font-size:14px;font-weight:600}
 .secondary.small{padding:8px 12px;font-size:13px;flex:none}
 
 /* glow on the dark theme */
-.go{box-shadow:0 0 0 1px rgba(167,139,250,.25),0 8px 28px var(--glow)}
+.go{box-shadow:0 0 0 1px rgba(157,184,255,.25),0 8px 28px var(--glow)}
 .nav-mini{box-shadow:0 0 16px var(--glow)}
-.pick.first{box-shadow:0 0 28px rgba(124,58,237,.28)}
+.pick.first{box-shadow:0 0 28px rgba(61,107,255,.28)}
 .logo{box-shadow:0 0 18px var(--glow)}
 
 /* floating stats card */
@@ -137,17 +137,17 @@ select{border:1px solid var(--line);border-radius:10px;padding:8px;font-size:14p
 .statcard[hidden]{display:none}
 .statcard b{color:var(--ink);font-size:13px}
 .stat-age::before{content:"·";margin-right:8px}
-.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(167,139,250,.6);animation:pulse 2s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(167,139,250,.55)}70%{box-shadow:0 0 0 8px rgba(167,139,250,0)}100%{box-shadow:0 0 0 0 rgba(167,139,250,0)}}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(157,184,255,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(157,184,255,.55)}70%{box-shadow:0 0 0 8px rgba(157,184,255,0)}100%{box-shadow:0 0 0 0 rgba(157,184,255,0)}}
 @media (prefers-reduced-motion: reduce){.pulse-dot{animation:none}}
 
 /* ---------- smooth motion ---------- */
 :root{--ease:cubic-bezier(.2,.8,.2,1)}
 button,.chip,.pick,.caropt,select,input{transition:transform .18s var(--ease),background-color .25s,border-color .25s,box-shadow .3s,color .25s,opacity .25s}
 button:active,.pick:active,.caropt:active{transform:scale(.97)}
-.go:hover{box-shadow:0 0 0 1px rgba(167,139,250,.4),0 10px 34px rgba(124,58,237,.6)}
+.go:hover{box-shadow:0 0 0 1px rgba(157,184,255,.4),0 10px 34px rgba(61,107,255,.6)}
 .chip.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}
-select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.25)}
+select:focus,input:focus{outline:none;border-color:#3d6bff;box-shadow:0 0 0 3px rgba(61,107,255,.25)}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @keyframes sheetUp{from{opacity:.6;transform:translateY(40px)}to{opacity:1;transform:none}}
@@ -174,26 +174,26 @@ select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px 
 .ctxt{font-size:12px;color:var(--muted);margin-top:12px}
 
 /* swipe to navigate */
-.swipe{position:relative;height:62px;margin-top:16px;border-radius:999px;background:#05080f;border:1px solid #2e2557;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;transition:background .4s var(--ease)}
+.swipe{position:relative;height:62px;margin-top:16px;border-radius:999px;background:#05080f;border:1px solid #1f2a55;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;transition:background .4s var(--ease)}
 .swipe-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;padding-left:64px;color:#fff;font-weight:700;font-size:15px;transition:opacity .2s}
-.chev{font-weight:800;letter-spacing:-1px;background:linear-gradient(90deg,#3b2f73 0%,#e9e3ff 50%,#3b2f73 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 1.6s linear infinite}
+.chev{font-weight:800;letter-spacing:-1px;background:linear-gradient(90deg,#23306f 0%,#e6eeff 50%,#23306f 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 1.6s linear infinite}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
-.swipe-thumb{position:absolute;left:5px;top:5px;width:76px;height:50px;border-radius:999px;border:0;background:#fff;color:#0b1220;display:grid;place-items:center;cursor:grab;box-shadow:0 4px 18px rgba(124,58,237,.55);transition:transform .5s var(--ease),background .3s,color .3s;touch-action:none}
+.swipe-thumb{position:absolute;left:5px;top:5px;width:76px;height:50px;border-radius:999px;border:0;background:#fff;color:#0b1220;display:grid;place-items:center;cursor:grab;box-shadow:0 4px 18px rgba(61,107,255,.55);transition:transform .5s var(--ease),background .3s,color .3s;touch-action:none}
 .swipe.drag .swipe-thumb{transition:none;cursor:grabbing}
 .swipe.sending{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent}
 .swipe.sending .swipe-label{padding-left:0;padding-right:70px;justify-content:center}
 .swipe.sending .chev{display:none}
-.swipe.done .swipe-thumb{color:#6d28d9}
+.swipe.done .swipe-thumb{color:#3156ff}
 .swipe.done .swipe-thumb svg{animation:pop .4s var(--ease)}
 @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
-.bolt-p{position:absolute;color:#e9e3ff;pointer-events:none;animation:fly 1s cubic-bezier(.2,.8,.2,1) forwards;filter:drop-shadow(0 0 6px rgba(196,181,253,.8))}
+.bolt-p{position:absolute;color:#e6eeff;pointer-events:none;animation:fly 1s cubic-bezier(.2,.8,.2,1) forwards;filter:drop-shadow(0 0 6px rgba(186,204,255,.8))}
 @keyframes fly{from{opacity:1;transform:translate(0,0) rotate(0) scale(.6)}to{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(1.1)}}
 .via{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;min-height:16px}
 .via .linkbtn{font-size:12px}
 
 /* notification that drops in from the top */
 .toast{position:fixed;left:50%;top:calc(10px + var(--safe-t));z-index:60;width:min(92vw,380px);display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;border-radius:22px;
-  background:rgba(18,24,38,.94);border:1px solid #2e2557;color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform:translateX(-50%)}
+  background:rgba(18,24,38,.94);border:1px solid #1f2a55;color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform:translateX(-50%)}
 .toast[hidden]{display:none}
 .toast:not([hidden]){animation:drop .55s var(--ease) both}
 @keyframes drop{from{opacity:0;transform:translate(-50%,-28px) scale(.92);filter:blur(6px)}to{opacity:1;transform:translate(-50%,0) scale(1);filter:none}}
@@ -238,14 +238,14 @@ select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px 
   opacity:.9;transition:opacity .3s;
 }
 .go{position:relative;overflow:hidden;
-  background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 45%),linear-gradient(135deg,rgba(124,58,237,.92),rgba(67,56,202,.92))!important;
-  border:1px solid rgba(196,181,253,.35)!important;
+  background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 45%),linear-gradient(135deg,rgba(61,107,255,.92),rgba(42,51,217,.92))!important;
+  border:1px solid rgba(186,204,255,.35)!important;
   -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 6px rgba(30,10,80,.35),0 10px 32px rgba(124,58,237,.5)!important}
-.chip.on{background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 50%),linear-gradient(135deg,rgba(124,58,237,.85),rgba(67,56,202,.85))!important;border-color:rgba(196,181,253,.4)!important;color:#fff}
-.pick.first{background:linear-gradient(160deg,rgba(196,181,253,.20),rgba(124,58,237,.06) 45%,rgba(67,56,202,.04)),var(--glass-tint)!important;border-color:rgba(167,139,250,.55)!important;
-  box-shadow:inset 0 1px 0 rgba(233,227,255,.4),0 0 30px rgba(124,58,237,.28),0 10px 30px rgba(0,0,0,.38)!important}
-.nav-mini{border:1px solid rgba(196,181,253,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 16px var(--glow)!important}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 6px rgba(10,20,90,.35),0 10px 32px rgba(61,107,255,.5)!important}
+.chip.on{background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 50%),linear-gradient(135deg,rgba(61,107,255,.85),rgba(42,51,217,.85))!important;border-color:rgba(186,204,255,.4)!important;color:#fff}
+.pick.first{background:linear-gradient(160deg,rgba(186,204,255,.20),rgba(61,107,255,.06) 45%,rgba(42,51,217,.04)),var(--glass-tint)!important;border-color:rgba(157,184,255,.55)!important;
+  box-shadow:inset 0 1px 0 rgba(230,238,255,.4),0 0 30px rgba(61,107,255,.28),0 10px 30px rgba(0,0,0,.38)!important}
+.nav-mini{border:1px solid rgba(186,204,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 0 16px var(--glow)!important}
 .logo{box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 0 18px var(--glow)}
 
 /* the bottom panel floats like an iOS sheet, map visible around it */
@@ -255,8 +255,8 @@ select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px 
 
 /* glass swipe track: the map glows through; thumb is a bright glass bead */
 .swipe{background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02)),rgba(5,8,15,.55)!important}
-.swipe.sending{background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 50%),linear-gradient(135deg,rgba(124,58,237,.9),rgba(67,56,202,.9))!important}
-.swipe-thumb{background:linear-gradient(180deg,#ffffff,#e9e6ff);box-shadow:inset 0 1px 0 #fff,inset 0 -2px 5px rgba(80,60,160,.25),0 6px 20px rgba(124,58,237,.55)}
+.swipe.sending{background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,0) 50%),linear-gradient(135deg,rgba(61,107,255,.9),rgba(42,51,217,.9))!important}
+.swipe-thumb{background:linear-gradient(180deg,#ffffff,#e4ecff);box-shadow:inset 0 1px 0 #fff,inset 0 -2px 5px rgba(40,60,170,.25),0 6px 20px rgba(61,107,255,.55)}
 
 /* sheets & modals: glass over a dimmed, blurred map */
 .modal{background:rgba(2,6,14,.35)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
@@ -273,3 +273,20 @@ select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px 
   .brand,.pill-btn,.chip,.statcard,.secondary,.x-close,.pick,.panel,.sheet,.toast,.ob-card,.swipe,select,#carSearch,.field input,.caropt{
     background:#111a2a!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 }
+
+/* ---------- chrome-blue numbers ----------
+   Big figures get a glossy liquid-chrome gradient: icy white highlight on top, electric blue in the
+   middle, deep royal blue with a hint of violet at the bottom, a faint warm/violet fringe on the
+   edges like light refracting, and a blue glow around them. */
+.amount .num,.pick .amt,.pick.first .amt{
+  background:linear-gradient(178deg,#ffffff 0%,#e3ecff 16%,#9cbcff 32%,#4f7cff 48%,#2f45ea 64%,#1b24b9 82%,#5b30d8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(-0.6px 0 0 rgba(255,138,92,.45)) drop-shadow(0.8px 0 0 rgba(150,90,255,.45)) drop-shadow(0 0 14px rgba(61,107,255,.55));
+}
+.amount .num{padding-right:2px}
+.amount .cur{color:#5f6f93}
+.caret{background:#7fa4ff;box-shadow:0 0 10px rgba(61,107,255,.8)}
+/* smaller totals in the results list: lighter chrome, no fringe, so they stay crisp */
+.pick .amt,.pick.first .amt{
+  background:linear-gradient(178deg,#ffffff 0%,#dfe9ff 35%,#8fb0ff 72%,#5b7fff 100%);
+  -webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 10px rgba(61,107,255,.45))}

@@ -200,7 +200,7 @@ async function addLayers() {
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#9db8ff", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
   for (const layer of ["badges", "selected"]) {
     map.on("click", layer, e => select(e.features[0].properties.i, false));
     map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
@@ -465,7 +465,7 @@ let linkAnim = 0;
 function drawLinks(originPos, targets) {
   const src = map.getSource("links"); if (!src) return;
   const from = [originPos[1], originPos[0]];
-  const lines = targets.map(x => ({ pts: arc(from, [x.l.lo, x.l.la]), c: x.best ? "#a78bfa" : "#6366f1", best: x.best ? 1 : 0 }));
+  const lines = targets.map(x => ({ pts: arc(from, [x.l.lo, x.l.la]), c: x.best ? "#9db8ff" : "#3d6bff", best: x.best ? 1 : 0 }));
   const frame = p => src.setData({ type: "FeatureCollection", features: lines.map(L1 => ({ type: "Feature",
     properties: { c: L1.c, best: L1.best },
     geometry: { type: "LineString", coordinates: L1.pts.slice(0, Math.max(2, Math.ceil(p * L1.pts.length))) } })) });
