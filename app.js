@@ -505,6 +505,16 @@ function countUp(els) {
   requestAnimationFrame(step);
 }
 
+// ---------- liquid glass highlight ----------
+// The soft highlight on glass controls follows the pointer or finger.
+const GLASS = ".brand,.pill-btn,.chip,.secondary,.pick,.statcard,.x-close,.caropt,.go,.swipe";
+if (!REDUCED_MOTION) document.addEventListener("pointermove", e => {
+  const el = e.target.closest && e.target.closest(GLASS); if (!el) return;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--gx", `${((e.clientX - r.left) / r.width) * 100}%`);
+  el.style.setProperty("--gy", `${((e.clientY - r.top) / r.height) * 100}%`);
+}, { passive: true });
+
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
 function updateStats() {
