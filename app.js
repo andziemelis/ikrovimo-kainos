@@ -88,50 +88,37 @@ const map = new maplibregl.Map({
   minZoom: 0.6, maxPitch: 85, dragRotate: true, touchPitch: true, pitchWithRotate: true, renderWorldCopies: false,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
+// Smoother feel: the globe keeps gliding after a flick and slows down gently; wheel zoom is softer.
+try {
+  map.dragPan.enable({ linearity: 0.25, easing: t => 1 - Math.pow(1 - t, 3), maxSpeed: 1600, deceleration: 1800 });
+  map.scrollZoom.setWheelZoomRate(1 / 600); map.scrollZoom.setZoomRate(1 / 140);
+} catch {}
 map.on("style.load", () => {
   try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
   // blue atmosphere glowing around the edge of the globe, fading out as you zoom in
-  try { map.setSky({ "sky-color": "#0a1f4d", "horizon-color": "#3d7be0", "fog-color": "#0a1f4d",
-    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.8, "fog-ground-blend": 0.9,
+  // thin, cool-grey atmosphere rim: just enough to separate the dark globe from space
+  try { map.setSky({ "sky-color": "#05070c", "horizon-color": "#2a3346", "fog-color": "#05070c",
+    "sky-horizon-blend": 0.5, "horizon-fog-blend": 0.7, "fog-ground-blend": 0.9,
     "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 9, 0] }); } catch {}
   nightEarth();
 });
 
-// Cities and towns all over the world glow like lights seen from space, so the whole globe
-// looks alive when zoomed out; they fade away as you zoom in to street level.
-function worldLights() {
-  const src = Object.entries(map.getStyle().sources || {}).find(([, s]) => s.type === "vector");
-  if (!src || map.getLayer("world-lights")) return;
-  const cls = ["match", ["get", "class"], "city", 3, "town", 2, "village", 1, 0];
-  map.addLayer({ id: "world-lights-halo", type: "circle", source: src[0], "source-layer": "place", maxzoom: 10,
-    filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
-    paint: { "circle-color": "#ffc861", "circle-blur": 1,
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", cls, 1.6], 6, ["*", cls, 4], 9, ["*", cls, 6]],
-      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.45, 7, 0.3, 9.5, 0] } });
-  map.addLayer({ id: "world-lights", type: "circle", source: src[0], "source-layer": "place", maxzoom: 10,
-    filter: ["in", ["get", "class"], ["literal", ["city", "town", "village"]]],
-    paint: { "circle-color": "#fff1c2",
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", cls, 0.35], 6, ["*", cls, 0.8], 9, ["*", cls, 1.1]],
-      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 8, 0.7, 9.5, 0] } });
-}
-
-// "Earth at night" look: deep blue seas, near-black land, faint roads and borders, soft labels.
+// Night look in consistent dark and black shades: black seas, charcoal land, faint grey roads and soft labels.
 function nightEarth() {
   const set = (id, prop, val) => { try { map.setPaintProperty(id, prop, val); } catch {} };
-  worldLights();
   for (const ly of map.getStyle().layers) {
     const sl = ly["source-layer"] || "", id = ly.id;
-    if (ly.type === "background") set(id, "background-color", "#040a19");
-    else if (sl === "water" && ly.type === "fill") { set(id, "fill-color", ["interpolate", ["linear"], ["zoom"], 2, "#1b4a8c", 8, "#163f78", 13, "#123563"]); set(id, "fill-outline-color", "#2a63b5"); }
-    else if (sl === "waterway") set(id, "line-color", "#1d4f91");
-    else if ((sl === "landcover" || sl === "landuse" || sl === "park") && ly.type === "fill") { set(id, "fill-color", "#07122a"); set(id, "fill-opacity", 0.6); }
-    else if (sl === "building" && ly.type === "fill") set(id, "fill-color", "#0c1a36");
-    else if (sl === "building" && ly.type === "fill-extrusion") set(id, "fill-extrusion-color", "#0f2145");
-    else if (sl === "transportation" && ly.type === "line") set(id, "line-color", ["interpolate", ["linear"], ["zoom"], 6, "rgba(120,160,230,0.10)", 12, "rgba(120,160,230,0.32)", 16, "rgba(150,185,245,0.45)"]);
-    else if (sl === "boundary" && ly.type === "line") set(id, "line-color", "rgba(140,180,255,0.35)");
+    if (ly.type === "background") set(id, "background-color", "#0b0f17");
+    else if (sl === "water" && ly.type === "fill") { set(id, "fill-color", "#04060b"); set(id, "fill-outline-color", "#151b27"); }
+    else if (sl === "waterway") set(id, "line-color", "#06090f");
+    else if ((sl === "landcover" || sl === "landuse" || sl === "park") && ly.type === "fill") { set(id, "fill-color", "#0d121b"); set(id, "fill-opacity", 0.5); }
+    else if (sl === "building" && ly.type === "fill") set(id, "fill-color", "#121824");
+    else if (sl === "building" && ly.type === "fill-extrusion") set(id, "fill-extrusion-color", "#151c2a");
+    else if (sl === "transportation" && ly.type === "line") set(id, "line-color", ["interpolate", ["linear"], ["zoom"], 6, "rgba(255,255,255,0.05)", 12, "rgba(255,255,255,0.14)", 16, "rgba(255,255,255,0.22)"]);
+    else if (sl === "boundary" && ly.type === "line") set(id, "line-color", "rgba(255,255,255,0.18)");
     else if (ly.type === "symbol") {
       if (/poi|housenumber/.test(id)) { try { map.setLayoutProperty(id, "visibility", "none"); } catch {} }
-      else { set(id, "text-color", "#9fb6e0"); set(id, "text-halo-color", "rgba(4,10,25,0.85)"); }
+      else { set(id, "text-color", "#8a93a3"); set(id, "text-halo-color", "rgba(4,6,11,0.9)"); }
     }
   }
 }
@@ -234,16 +221,6 @@ async function addLayers() {
     paint: { "circle-color": ["get", "c"], "circle-blur": 1,
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["case", ["==", ["get", "pin"], 1], 16, 7], 14, ["case", ["==", ["get", "pin"], 1], 34, 18]],
       "circle-opacity": ["case", ["==", ["get", "pin"], 1], 0.6, 0.28] } }, "badges");
-  // Charging locations as night lights, like cities seen from space: every location, warm and glowing,
-  // strongest from far away and fading out as the badges take over.
-  map.addSource("lights", { type: "geojson", data: { type: "FeatureCollection",
-    features: L.map(l => ({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] }, properties: {} })) } });
-  map.addLayer({ id: "lights-halo", type: "circle", source: "lights", maxzoom: 13,
-    paint: { "circle-color": "#ffcf6b", "circle-blur": 1, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 3, 8, 7, 12, 10],
-      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.35, 9, 0.22, 12.5, 0] } }, "glow");
-  map.addLayer({ id: "lights", type: "circle", source: "lights", maxzoom: 13,
-    paint: { "circle-color": "#fff3c4", "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 0.8, 8, 1.6, 12, 2.2],
-      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.95, 10, 0.6, 12.5, 0] } }, "glow");
   // animated "data connection" lines from the start point to the Best Charge results
   map.addSource("links", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "links-glow", type: "line", source: "links", layout: { "line-cap": "round" },
@@ -537,16 +514,24 @@ function drawLinks(originPos, targets) {
   linkAnim = requestAnimationFrame(step);
 }
 
-// Slowly spinning globe behind the welcome screen; stops as soon as the map is touched.
-let spinning = false;
-function spinStep() {
+// Slowly spinning globe (welcome screen, or when left zoomed out). It turns every frame instead of in
+// steps, eases in when it starts, and stops the moment the map is touched.
+let spinning = false, spinRaf = 0, spinStart = 0, spinLast = 0;
+const SPIN_DEG_PER_SEC = 4;
+function spinFrame(now) {
   if (!spinning) return;
   if (map.getZoom() >= 3.5) { spinning = false; return; }
-  const c = map.getCenter(); c.lng -= 8;
-  map.easeTo({ center: c, duration: 1000, easing: t => t, essential: true });
+  const dt = Math.min(0.05, (now - spinLast) / 1000); spinLast = now;
+  const ramp = Math.min(1, (now - spinStart) / 1500);            // ease in over 1.5 s
+  const c = map.getCenter(); c.lng -= SPIN_DEG_PER_SEC * dt * ramp * ramp;
+  map.jumpTo({ center: c });
+  spinRaf = requestAnimationFrame(spinFrame);
 }
-function startSpin() { if (REDUCED_MOTION) return; spinning = true; spinStep(); }
-function stopSpin() { spinning = false; clearTimeout(idleSpin.h); }
+function startSpin() {
+  if (REDUCED_MOTION || spinning) return;
+  spinning = true; spinStart = spinLast = performance.now(); spinRaf = requestAnimationFrame(spinFrame);
+}
+function stopSpin() { spinning = false; cancelAnimationFrame(spinRaf); clearTimeout(idleSpin.h); }
 // When you leave the map zoomed out to the whole planet, it starts turning slowly after a few seconds.
 function idleSpin() {
   clearTimeout(idleSpin.h);
@@ -554,7 +539,6 @@ function idleSpin() {
   idleSpin.h = setTimeout(() => { if (map.getZoom() < 3.5 && !spinning) startSpin(); }, 4000);
 }
 map.on("idle", () => { if (!spinning && map.getZoom() < 3.5) idleSpin(); });
-map.on("moveend", () => { if (spinning) spinStep(); });
 for (const ev of ["mousedown", "touchstart", "wheel", "dragstart"]) map.on(ev, stopSpin);
 function flyIntoLithuania() {
   stopSpin();
