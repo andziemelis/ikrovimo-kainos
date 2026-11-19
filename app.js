@@ -66,39 +66,78 @@ map.on("style.load", () => {
   try { map.setSky({ "sky-color": "#0b1530", "horizon-color": "#1e3a5f", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
 });
 
+// Price level of a location, used for both the colour and the marker icon.
+const levelKey = p => p == null ? "unk" : p === 0 ? "free" : p <= 0.29 ? "cheap" : p <= 0.37 ? "mid" : "high";
+const LEVEL_COLOURS = { free: "#0ea5e9", cheap: "#16a34a", mid: "#f59e0b", high: "#dc2626", unk: "#94a3b8" };
+const BADGE_ZOOM = 9.5; // below this, plain dots; from here on, charger badges
+
 function geojson() {
   const features = [];
   for (const l of L) {
     if (fastOnly && !isFast(l)) continue;
     const { p } = priceOf(l);
     if (hideUnknown && p == null) continue;
+    const k = levelKey(p);
     features.push({ type: "Feature", geometry: { type: "Point", coordinates: [l.lo, l.la] },
-      properties: { i: l.i, c: colourOf(p), known: p == null ? 0 : 1, label: p == null ? "" : p === 0 ? T().free : money(p) } });
+      properties: { i: l.i, c: colourOf(p), known: p == null ? 0 : 1, icon: `badge-${k}${isFast(l) ? "-dc" : ""}`,
+        label: p == null ? "" : p === 0 ? T().free : money(p) } });
   }
   return { type: "FeatureCollection", features };
 }
 
-function addLayers() {
+// Round badge marker (design option D): dark circle, price-coloured ring and charger glyph,
+// a yellow lightning badge for fast (DC) chargers; the selected version is filled.
+function badgeSVG(colour, dc, selected) {
+  const ring = selected ? `<circle cx="20" cy="20" r="18" fill="${colour}" stroke="#ffffff" stroke-width="2.5"/>`
+    : `<circle cx="20" cy="20" r="17" fill="#141f30" stroke="${colour}" stroke-width="4"/>`;
+  const g = selected ? "#ffffff" : colour;
+  const glyph = `<g fill="none" stroke="${g}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="13" y="11" width="9" height="16" rx="2"/><path d="M18 14.5 16.5 18h3l-1.5 3.5"/>
+    <path d="M22 19h1.5a1.2 1.2 0 0 1 1.2 1.2v2.3a1.2 1.2 0 0 0 2.4 0V17l-1.2-1.6"/></g>`;
+  const fast = dc ? `<circle cx="32" cy="8" r="7" fill="#facc15" stroke="#0b1220" stroke-width="2"/><path d="M33 4.2 30 8.6h2.2l-.8 3.2 3-4.4h-2.2z" fill="#0b1220"/>` : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 40 40">${ring}${glyph}${fast}</svg>`;
+}
+function loadBadges() {
+  const jobs = [];
+  for (const [k, colour] of Object.entries(LEVEL_COLOURS)) for (const dc of [false, true]) for (const sel of [false, true]) {
+    const name = `badge-${k}${dc ? "-dc" : ""}${sel ? "-sel" : ""}`;
+    jobs.push(new Promise(resolve => {
+      const img = new Image(80, 80);
+      img.onload = () => { if (!map.hasImage(name)) map.addImage(name, img, { pixelRatio: 2 }); resolve(); };
+      img.onerror = resolve;
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(badgeSVG(colour, dc, sel));
+    }));
+  }
+  return Promise.all(jobs);
+}
+
+async function addLayers() {
+  await loadBadges();
   map.addSource("chargers", { type: "geojson", data: geojson() });
   map.addSource("me", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-  map.addLayer({ id: "chargers", type: "circle", source: "chargers",
+  map.addLayer({ id: "chargers", type: "circle", source: "chargers", maxzoom: BADGE_ZOOM,
     paint: {
       "circle-color": ["get", "c"],
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 3, 10, 5, 14, 8],
-      "circle-stroke-color": "#0b1220", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 12, 1.5],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 3, 9.5, 4.5],
+      "circle-stroke-color": "#0b1220", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 9.5, 1.2],
       "circle-sort-key": ["get", "known"],
     } });
-  map.addLayer({ id: "selected", type: "circle", source: "chargers", filter: ["==", ["get", "i"], -1],
-    paint: { "circle-color": ["get", "c"], "circle-radius": 13, "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+  map.addLayer({ id: "badges", type: "symbol", source: "chargers", minzoom: BADGE_ZOOM,
+    layout: { "icon-image": ["get", "icon"], "icon-size": ["interpolate", ["linear"], ["zoom"], 9.5, 0.7, 13, 0.9, 16, 1.05],
+      "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "known"] } });
   map.addLayer({ id: "labels", type: "symbol", source: "chargers", minzoom: 12.5, filter: ["==", ["get", "known"], 1],
     layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12,
-      "text-offset": [0, 1.3], "text-anchor": "top", "text-allow-overlap": false },
+      "text-offset": [0, 1.7], "text-anchor": "top", "text-allow-overlap": false },
     paint: { "text-color": "#f1f5f9", "text-halo-color": "#0b1220", "text-halo-width": 1.8 } });
+  map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
+    layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#7c3aed", "#2563eb"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
-  map.on("click", "chargers", e => select(e.features[0].properties.i, false));
-  map.on("mouseenter", "chargers", () => map.getCanvas().style.cursor = "pointer");
-  map.on("mouseleave", "chargers", () => map.getCanvas().style.cursor = "");
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#a78bfa", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
+  for (const layer of ["chargers", "badges"]) {
+    map.on("click", layer, e => select(e.features[0].properties.i, false));
+    map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
+    map.on("mouseleave", layer, () => map.getCanvas().style.cursor = "");
+  }
 }
 function refreshMap() { const s = map.getSource("chargers"); if (s) s.setData(geojson()); highlight(); }
 function highlight() { if (map.getLayer("selected")) map.setFilter("selected", ["==", ["get", "i"], selected ?? -1]); }
