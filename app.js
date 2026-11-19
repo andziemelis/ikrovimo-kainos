@@ -38,7 +38,12 @@ function townOf(l) {
 }
 const colourOf = p => p == null ? "#94a3b8" : p === 0 ? "#0ea5e9" : p <= 0.29 ? "#16a34a" : p <= 0.37 ? "#f59e0b" : "#dc2626";
 const levelOf = p => p == null ? T().unknown : p === 0 ? T().free : p <= 0.29 ? T().cheap : p <= 0.37 ? T().average : T().expensive;
-function toast(msg, ms = 3500) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, ms); }
+function toast(msg, ms = 3500, sub = "") {
+  const t = $("toast");
+  $("toastT").textContent = msg; $("toastS").textContent = sub; $("toastS").hidden = !sub;
+  t.hidden = true; void t.offsetWidth; t.hidden = false;           // restart the drop-in animation
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, ms);
+}
 
 // ---------- state ----------
 let L = [], DATA = null, selected = null, userPos = null, lastOrigin = null;
@@ -212,14 +217,16 @@ function select(i, fly = true) {
   const l = L[i], t = T(), kwh = +$("kwh").value;
   const { p, o } = priceOf(l);
   const priced = l.offers.filter(x => x.m != null).length;
-  let total = p == null ? t.noPriceLong : p === 0 ? t.freeToCharge : t.forKwh(money(p * kwh), kwh, Math.round(kwh / car.cons * 100));
-  const ct = chargeTime(l, kwh);
-  total += `<div class="breakdown">${myCar ? t.chargeTimeCar(ct.min, ct.kw) : t.chargeTime(ct.min, ct.kw)}</div>`;
-  if (myCar && l.kw > 22 && !carFitsDC(l)) total += `<div class="breakdown">${t.dcIncompatible}</div>`;
-  if (p != null && p > 0 && lastOrigin) {
-    const c = tripCost(km(lastOrigin.pos[0], lastOrigin.pos[1], l.la, l.lo), p, kwh);
-    total += `<div class="breakdown">${t.detailTrip(lastOrigin.label, Math.round(c.road * 10) / 10, money(c.trip), money(c.total))}</div>`;
+  // The big number: what this charge costs in total (including the trip when we know where you start).
+  let amount = null, parts = [];
+  if (p != null && p > 0) {
+    amount = p * kwh; parts.push(`${t.chargingLbl} ${money(p * kwh)}`);
+    if (lastOrigin) { const c = tripCost(km(lastOrigin.pos[0], lastOrigin.pos[1], l.la, l.lo), p, kwh); amount = c.total; parts.push(`${t.tripLbl} ${money(c.trip)}`); }
+    parts.push(kwhPrice(p));
   }
+  const ct = chargeTime(l, kwh);
+  const dur = ct.min >= 90 ? (lang === "lt" ? `${String(Math.round(ct.min / 30) / 2).replace(".", ",")} val.` : `${Math.round(ct.min / 30) / 2} h`) : `${ct.min} min`;
+  const timeLine = myCar ? t.chargeTimeCar(dur, ct.kw) : t.chargeTime(dur, ct.kw);
   const offers = l.offers.map(x => {
     const sub = [x.ac != null && t.slowFrom(money(x.ac)), x.dc != null && t.fastFrom(money(x.dc))].filter(Boolean).join(" · ");
     const head = x.m == null ? t.noPrice : x.f ? t.free : `${t.from} ${kwhPrice(x.m)}`;
@@ -227,45 +234,111 @@ function select(i, fly = true) {
       ${sub ? `<div class="s">${sub}</div>` : ""}
       ${x.t.length ? `<ul>${x.t.map(s => `<li>${translateTariff(s)}</li>`).join("")}</ul>` : ""}</div>`;
   }).join("");
+  const app = store.get("navApp", null);
   $("detail").innerHTML = `
-    <div class="d-top">
-      <div>
-        <div class="d-where">${townOf(l)} · ${t.points(l.n)} · ${t.upTo} ${l.kw} kW · ${l.ctxt}</div>
-        <div class="d-price">${p == null ? "—" : p === 0 ? t.free : `${money(p)}<small>/kWh</small>`}</div>
-        <div class="d-total">${total}${o && l.offers.length > 1 && p != null ? " · " + t.cheapestVia(o.op) : ""}</div>
-      </div>
-      <span class="tag" style="background:${colourOf(p)}">${levelOf(p)}</span>
+    <button class="x-close" id="dClose" aria-label="${t.close}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+    <div class="d-where">${townOf(l)} · ${t.points(l.n)} · ${t.upTo} ${l.kw} kW</div>
+    <div class="amount" id="dAmt" aria-live="polite"></div>
+    <div class="d-sub">${amount != null ? parts.join(" · ") : p === 0 ? t.freeToCharge : t.noPriceLong}
+      <span class="tag" style="background:${colourOf(p)}">${levelOf(p)}</span></div>
+    <div class="d-sub">${timeLine}${o && l.offers.length > 1 && p != null ? " · " + t.cheapestVia(o.op) : ""}</div>
+    ${myCar && l.kw > 22 && !carFitsDC(l) ? `<div class="d-sub">${t.dcIncompatible}</div>` : ""}
+    <div class="swipe" id="swipe">
+      <span class="swipe-label"><span id="swipeTxt">${t.slideToNav}</span><span class="chev" aria-hidden="true">›››</span></span>
+      <button class="swipe-thumb" id="swipeThumb" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
-    <div class="d-actions">
-      <button class="go" id="dNav"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg> ${t.navigate}</button>
-      <button class="secondary" id="dClose">${t.close}</button>
-    </div>
+    <div class="via">${app ? `${t.viaApp(NAV_NAMES[app])} · <button class="linkbtn" id="changeApp">${t.changeLbl}</button>` : ""}</div>
     ${l.offers.length > 1 ? `<div class="inf">${t.manyCompanies(l.offers.length, priced)}</div>` : ""}
     ${l.offers.some(x => x.pk) ? `<div class="warn">${t.parkingWarn}</div>` : ""}
     ${l.offers.some(x => x.fx) ? `<div class="warn">${t.fixedWarn}</div>` : ""}
     ${l.offers.some(x => x.fo) ? `<div class="inf">${t.freeOptInfo}</div>` : ""}
+    <div class="ctxt">${l.ctxt}</div>
     ${offers}`;
-  $("home").hidden = true; $("detail").hidden = false; $("panel").scrollTop = 0;
-  $("dNav").onclick = () => navigate(l);
+  $("home").hidden = true; $("detail").hidden = true; void $("detail").offsetWidth; $("detail").hidden = false; $("panel").scrollTop = 0;
+  typeAmount($("dAmt"), amount == null ? (p === 0 ? t.free : "—") : amount);
   $("dClose").onclick = closeDetail;
+  if ($("changeApp")) $("changeApp").onclick = () => { store.set("navApp", null); navigate(l); };
+  setupSwipe(l);
   if (fly) cinematicTo(l);
 }
 function closeDetail() { selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; $("home").classList.remove("enter"); void $("home").offsetWidth; $("home").classList.add("enter"); }
 
 // ---------- navigation hand-off ----------
-function navigate(l) {
+const NAV_NAMES = { google: "Google Maps", waze: "Waze", apple: "Apple Maps" };
+function navLinks(l) {
   const ll = `${l.la},${l.lo}`;
-  const links = {
-    google: `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving`,
-    waze: `https://waze.com/ul?ll=${ll}&navigate=yes`,
-    apple: `https://maps.apple.com/?daddr=${ll}&dirflg=d`,
-  };
+  return { google: `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving`,
+    waze: `https://waze.com/ul?ll=${ll}&navigate=yes`, apple: `https://maps.apple.com/?daddr=${ll}&dirflg=d` };
+}
+// Ask which app to use (first time, or when changing); the choice is remembered on this device.
+function navigate(l) {
+  const links = navLinks(l);
   $("navGoogle").href = links.google; $("navWaze").href = links.waze; $("navApple").href = links.apple;
   $("navModal").hidden = false;
 }
-for (const id of ["navGoogle", "navWaze", "navApple"]) $(id).addEventListener("click", () => $("navModal").hidden = true);
+for (const [id, key] of [["navGoogle", "google"], ["navWaze", "waze"], ["navApple", "apple"]])
+  $(id).addEventListener("click", () => { store.set("navApp", key); $("navModal").hidden = true; });
 $("navCancel").onclick = () => $("navModal").hidden = true;
 $("navModal").addEventListener("click", e => { if (e.target.id === "navModal") $("navModal").hidden = true; });
+
+// ---------- swipe to navigate (like "swipe to send" in payment apps) ----------
+function setupSwipe(l) {
+  const sw = $("swipe"), thumb = $("swipeThumb"), label = sw.querySelector(".swipe-label");
+  let x = 0, start = 0, max = 0, dragging = false, moved = false, done = false;
+  const place = v => { thumb.style.transform = `translateX(${v}px)`; label.style.opacity = String(Math.max(0, 1 - v / (max || 1) * 1.4)); };
+  const reset = () => { x = 0; sw.classList.remove("drag", "sending", "done"); place(0); label.style.opacity = ""; $("swipeTxt").textContent = T().slideToNav; done = false; };
+  const complete = () => {
+    if (done) return; done = true;
+    const app = store.get("navApp", null);
+    if (!app) { reset(); navigate(l); return; }                    // first time: pick the app
+    max = sw.clientWidth - thumb.offsetWidth - 8; place(max);
+    sw.classList.add("sending"); label.style.opacity = "1";
+    $("swipeTxt").textContent = T().openingApp(NAV_NAMES[app]);
+    if (!REDUCED_MOTION) burst(sw);
+    setTimeout(() => {
+      sw.classList.add("done"); $("swipeTxt").textContent = T().readyApp;
+      thumb.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      setTimeout(() => { window.location.href = navLinks(l)[app]; setTimeout(reset, 1500); }, REDUCED_MOTION ? 0 : 450);
+    }, REDUCED_MOTION ? 0 : 750);
+  };
+  thumb.addEventListener("pointerdown", e => {
+    if (done) return; dragging = true; moved = false; max = sw.clientWidth - thumb.offsetWidth - 8;
+    start = e.clientX - x; sw.classList.add("drag"); thumb.setPointerCapture(e.pointerId);
+  });
+  thumb.addEventListener("pointermove", e => {
+    if (!dragging) return; x = Math.min(max, Math.max(0, e.clientX - start)); if (x > 4) moved = true; place(x);
+  });
+  const end = () => {
+    if (!dragging) return; dragging = false; sw.classList.remove("drag");
+    if (x > max * 0.8) complete(); else if (!moved) complete(); else { x = 0; place(0); label.style.opacity = ""; }
+  };
+  thumb.addEventListener("pointerup", end); thumb.addEventListener("pointercancel", end);
+  thumb.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); complete(); } });
+}
+// small lightning bolts flying out of the pill, like the bills in the payment animation
+function burst(host) {
+  for (let i = 0; i < 9; i++) {
+    const b = document.createElement("span"); b.className = "bolt-p"; b.textContent = "";
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M13.5 2 5 13.5h6L9.5 22 19 9.5h-6.2z" fill="currentColor"/></svg>';
+    b.style.left = `${20 + Math.random() * 45}%`; b.style.top = `${30 + Math.random() * 40}%`;
+    b.style.setProperty("--dx", `${(Math.random() - .3) * 120}px`); b.style.setProperty("--dy", `${-20 - Math.random() * 50}px`);
+    b.style.setProperty("--r", `${(Math.random() - .5) * 120}deg`); b.style.animationDelay = `${i * 45}ms`;
+    host.appendChild(b); setTimeout(() => b.remove(), 1300);
+  }
+}
+
+// The total types itself in, digit by digit, with a blinking caret.
+function typeAmount(el, value) {
+  const isNum = typeof value === "number";
+  const parts = isNum ? (lang === "lt" ? [value.toFixed(2).replace(".", ","), "€", true] : [value.toFixed(2), "€", false]) : [String(value), "", false];
+  const [num, cur, curAfter] = parts;
+  const render = shown => el.innerHTML = (cur && !curAfter ? `<span class="cur">${cur}</span>` : "") + `<span class="num">${shown}</span>` +
+    (cur && curAfter ? `<span class="cur">${cur}</span>` : "") + (shown.length < num.length ? '<span class="caret"></span>' : "");
+  if (REDUCED_MOTION || !isNum) { render(num); return; }
+  let i = 0; render("");
+  clearInterval(typeAmount.h);
+  typeAmount.h = setInterval(() => { i++; render(num.slice(0, i)); if (i >= num.length) clearInterval(typeAmount.h); }, 70);
+}
 
 // ---------- cost model ----------
 // Total cost of charging at a location = the charge itself + the trip there and back:
@@ -336,7 +409,7 @@ async function bestCharge() {
   countUp($("results").querySelectorAll(".amt[data-v]"));
   $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
     const nav = e.target.closest("[data-nav]");
-    if (nav) { e.stopPropagation(); navigate(L[+nav.dataset.nav]); } else select(+el.dataset.i);
+    if (nav) { e.stopPropagation(); const l2 = L[+nav.dataset.nav], app = store.get("navApp", null); if (app) window.location.href = navLinks(l2)[app]; else navigate(l2); } else select(+el.dataset.i);
   }));
   const b = new maplibregl.LngLatBounds([oLo, oLa], [oLo, oLa]);
   top.forEach(x => b.extend([x.l.lo, x.l.la]));
