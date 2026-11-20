@@ -20,6 +20,7 @@ const TOWNS = [["Vilnius",54.687,25.280],["Kaunas",54.898,23.904],["Klaipėda",5
 
 // ---------- small helpers ----------
 const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -197,10 +198,15 @@ async function addLayers() {
     paint: { "line-color": ["get", "c"], "line-width": 10, "line-blur": 8, "line-opacity": 0.45 } }, "glow");
   map.addLayer({ id: "links", type: "line", source: "links", layout: { "line-cap": "round" },
     paint: { "line-color": ["get", "c"], "line-width": ["case", ["==", ["get", "best"], 1], 3, 2], "line-opacity": 0.95 } }, "glow");
+  map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#3d6bff", "line-width": 14, "line-blur": 10, "line-opacity": 0.45 } }, "links-glow");
+  map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#9db8ff", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 6], "line-opacity": 0.95 } }, "links-glow");
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
   map.addLayer({ id: "me", type: "circle", source: "me",
-    paint: { "circle-color": ["match", ["get", "kind"], "home", "#9db8ff", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
+    paint: { "circle-color": ["match", ["get", "kind"], "home", "#9db8ff", "dest", "#f8fafc", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
   for (const layer of ["badges", "selected"]) {
     map.on("click", layer, e => select(e.features[0].properties.i, false));
     map.on("mouseenter", layer, () => map.getCanvas().style.cursor = "pointer");
@@ -268,17 +274,22 @@ function closeDetail() { requestAnimationFrame(() => snapSheet(sheetState)); sel
 const NAV_NAMES = { google: "Google Maps", waze: "Waze", apple: "Apple Maps" };
 function navLinks(l) {
   const ll = `${l.la},${l.lo}`;
-  return { google: `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving`,
+  const g = route ? `https://www.google.com/maps/dir/?api=1${route.from.kind === "me" ? "" : `&origin=${route.from.pos.join(",")}`}&destination=${route.to.pos.join(",")}&waypoints=${ll}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving`;
+  return { google: g,
     waze: `https://waze.com/ul?ll=${ll}&navigate=yes`, apple: `https://maps.apple.com/?daddr=${ll}&dirflg=d` };
 }
 // Ask which app to use (first time, or when changing); the choice is remembered on this device.
+let navTarget = null;
+function goTo(l, app) { logCharge(l.i); window.location.href = navLinks(l)[app]; }
 function navigate(l) {
+  navTarget = l;
   const links = navLinks(l);
   $("navGoogle").href = links.google; $("navWaze").href = links.waze; $("navApple").href = links.apple;
   $("navModal").hidden = false;
 }
 for (const [id, key] of [["navGoogle", "google"], ["navWaze", "waze"], ["navApple", "apple"]])
-  $(id).addEventListener("click", () => { store.set("navApp", key); $("navModal").hidden = true; });
+  $(id).addEventListener("click", () => { if (navTarget) logCharge(navTarget.i); store.set("navApp", key); $("navModal").hidden = true; });
 $("navCancel").onclick = () => $("navModal").hidden = true;
 $("navModal").addEventListener("click", e => { if (e.target.id === "navModal") $("navModal").hidden = true; });
 
@@ -299,7 +310,7 @@ function setupSwipe(l) {
     setTimeout(() => {
       sw.classList.add("done"); $("swipeTxt").textContent = T().readyApp;
       thumb.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      setTimeout(() => { window.location.href = navLinks(l)[app]; setTimeout(reset, 1500); }, REDUCED_MOTION ? 0 : 450);
+      setTimeout(() => { goTo(l, app); setTimeout(reset, 1500); }, REDUCED_MOTION ? 0 : 450);
     }, REDUCED_MOTION ? 0 : 750);
   };
   thumb.addEventListener("pointerdown", e => {
@@ -396,32 +407,251 @@ async function bestCharge() {
   const top = [];
   for (const x of paid) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
   pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
+  lastPicks = new Map(top.map(x => [x.l.i, { op: x.o.op, total: x.c.total, save: Math.max(0, nearest.c.total - x.c.total) }]));
   drawLinks(origin.pos, top.map((x, n) => ({ l: x.l, best: n === 0 })));
   // Kept deliberately short: one total, where, and the saving. The breakdown lives in the station card.
   $("results").innerHTML = `<div class="res-head">${t.resultsHead}</div>` + top.map((x, n) => {
     const saving = nearest.c.total - x.c.total;
     const extra = x === nearest ? t.isNearest : saving > 0.2 ? t.saves(money(saving)) : "";
-    return `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}" style="animation-delay:${n * 80}ms">
-      <div class="amt" data-v="${x.c.total}">${money(x.c.total)}</div>
-      <div class="meta"><b>${x.o.op}</b><span>${x.c.oneWay.toFixed(1)} km${extra ? ` · <em>${extra}</em>` : ""}</span></div>
-      <button class="nav-mini" data-nav="${x.l.i}" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
-    </div>`;
+    return pickHTML(x, n, `${x.c.oneWay.toFixed(1)} km${extra ? ` · <em>${extra}</em>` : ""}`);
   }).join("");
-  document.querySelector(".legend").hidden = true;
-  countUp($("results").querySelectorAll(".amt[data-v]"));
-  $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
-    const nav = e.target.closest("[data-nav]");
-    if (nav) { e.stopPropagation(); const l2 = L[+nav.dataset.nav], app = store.get("navApp", null); if (app) window.location.href = navLinks(l2)[app]; else navigate(l2); } else select(+el.dataset.i);
-  }));
+  wirePicks();
   const b = new maplibregl.LngLatBounds([oLo, oLa], [oLo, oLa]);
   top.forEach(x => b.extend([x.l.lo, x.l.la]));
   map.fitBounds(b, { padding: { top: 140, bottom: window.innerWidth < 760 ? window.innerHeight * 0.55 : 60, left: window.innerWidth < 760 ? 40 : 440, right: 40 }, maxZoom: 14, pitch: 35 });
 }
 
+let lastPicks = new Map();   // station → { op, total, save } from the latest results, for the wallet
+function wirePicks() {
+  document.querySelector(".legend").hidden = true;
+  countUp($("results").querySelectorAll(".amt[data-v]"));
+  $("results").querySelectorAll(".pick").forEach(el => el.addEventListener("click", e => {
+    const nav = e.target.closest("[data-nav]");
+    if (nav) { e.stopPropagation(); const l2 = L[+nav.dataset.nav], app = store.get("navApp", null); if (app) goTo(l2, app); else navigate(l2); } else select(+el.dataset.i);
+  }));
+}
+const pickHTML = (x, n, metaLine) => `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}" style="animation-delay:${n * 80}ms">
+      <div class="amt" data-v="${x.c.total}">${money(x.c.total)}</div>
+      <div class="meta"><b>${x.o.op}</b><span>${metaLine}</span></div>
+      <button class="nav-mini" data-nav="${x.l.i}" aria-label="${T().navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
+    </div>`;
+const rerun = () => route ? routeBest() : bestCharge();
+
+// ---------- wallet: estimated savings from charges picked through the app ----------
+function logCharge(i) {
+  const pk = lastPicks.get(i); if (!pk) return;
+  const log = store.get("log", []), now = Date.now();
+  if (log.some(e => e.i === i && now - e.t < 3 * 3600e3)) return;   // same stop again soon after: count once
+  log.push({ t: now, i, op: pk.op, total: +pk.total.toFixed(2), save: +pk.save.toFixed(2) });
+  store.set("log", log.slice(-200));
+}
+function monthLog() { const d = new Date(), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); return store.get("log", []).filter(e => e.t >= m0); }
+function openWallet() {
+  const t = T(), ml = monthLog(), saved = ml.reduce((a, e) => a + e.save, 0);
+  $("wSub").textContent = t.walletSub(ml.length);
+  $("wList").innerHTML = ml.slice(-5).reverse().map(e => `<div class="w-row"><span>${e.op}<em>${new Date(e.t).toLocaleDateString(lang === "lt" ? "lt-LT" : "en-GB", { day: "numeric", month: "short" })}</em></span><b>${money(e.total)}</b></div>`).join("");
+  $("walletModal").hidden = false;
+  typeAmount($("wAmt"), saved);
+}
+$("walletClose").onclick = () => $("walletModal").hidden = true;
+$("walletModal").addEventListener("click", e => { if (e.target.id === "walletModal") $("walletModal").hidden = true; });
+
+// ---------- tabs: Map and Account ----------
+let tab = "map";
+const TAB_ICONS = {
+  map: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5zM9 4v13.5M15 6.5V20"/></svg>',
+  account: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7.5 8c.6-3.4 3.7-5.5 7.5-5.5s6.9 2.1 7.5 5.5"/></svg>' };
+function buildTabs() {
+  liquidSeg($("tabSeg"), ["map", "account"].map(v => ({ value: v, label: `${TAB_ICONS[v]}<span>${v === "map" ? T().tabMap : T().tabAccount}</span>` })), tab, setTab);
+}
+function setTab(v) {
+  tab = v;
+  document.documentElement.classList.toggle("tab-account", v === "account");
+  $("accountPage").hidden = v !== "account";
+  if (v === "account") { closeRouteForm(); renderAccount(); $("accountPage").scrollTop = 0; }
+  else requestAnimationFrame(() => snapSheet(sheetState, false));
+}
+function renderAccount() {
+  const t = T(), ml = monthLog(), saved = ml.reduce((a, e) => a + e.save, 0);
+  $("liCarVal").textContent = myCar ? [myCar[0], myCar[1]].filter(Boolean).join(" ") : t.noCar;
+  $("liWalletVal").textContent = saved > 0 ? t.savedShort(money(saved)) : "";
+  $("acctFoot").textContent = t.acctFoot;
+  if (authUser) { $("acctHead").textContent = authUser.displayName || authUser.email || ""; $("acctSub").textContent = ""; $("acctBtns").hidden = true; }
+}
+const authSoon = () => FIREBASE_CONFIG ? signIn(new firebase.auth.GoogleAuthProvider()) : toast(T().signInSoon, 3500, T().signInSoonSub);
+$("loginBtn").onclick = authSoon; $("signupBtn").onclick = authSoon;
+$("liCar").onclick = () => openOnboard(true);
+$("liSettings").onclick = openCar;
+$("liWallet").onclick = openWallet;
+
+// ---------- route planner (top bar) ----------
+// Pick a start and a destination; the app finds where along the way charging costs the least,
+// counting the small detour off the road. Places come from Photon (OpenStreetMap), the road route
+// from the OSRM demo server; without a connection it falls back to a straight-line estimate.
+const CORRIDOR_KM = 3;
+let route = null, rFromSel = { kind: "me" }, rToSel = null, activeField = "to", geoTimer = 0, geoSeq = 0;
+const fold = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const fieldLabel = s => s.kind === "me" ? T().myLocation : s.kind === "home" ? T().homeLbl : s.label;
+const ICON_PIN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+const ICON_ME = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg>';
+const ICON_HOME = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3 2 11.5h3V20h5.5v-5h3v5H19v-8.5h3z"/></svg>';
+let sgItems = [];
+function renderSuggest(items) {
+  sgItems = items;
+  $("rSuggest").innerHTML = items.length ? items.map((s, n) => `<button class="sg" type="button" data-n="${n}"><span class="sg-ic">${s.kind === "me" ? ICON_ME : s.kind === "home" ? ICON_HOME : ICON_PIN}</span><span class="sg-t"><b>${esc(s.label)}</b>${s.sub ? `<em>${esc(s.sub)}</em>` : ""}</span></button>`).join("")
+    : `<div class="sg-empty">${T().noGeo}</div>`;
+}
+function baseItems() {
+  const it = activeField === "from" ? [{ kind: "me", label: T().myLocation }] : [];
+  if (homeLoc) it.push({ kind: "home", label: T().homeLbl, pos: homeLoc });
+  return it;
+}
+function suggestFor(q) {
+  const f = fold(q.trim());
+  if (!f) { renderSuggest([...baseItems(), ...TOWNS.slice(0, 5).map(([n, la, lo]) => ({ kind: "place", label: n, sub: "Lietuva", pos: [la, lo] }))]); return; }
+  const local = TOWNS.filter(([n]) => fold(n).startsWith(f)).slice(0, 4).map(([n, la, lo]) => ({ kind: "place", label: n, sub: "Lietuva", pos: [la, lo] }));
+  const mine = baseItems().filter(s => fold(s.label).startsWith(f));
+  renderSuggest([...mine, ...local]);
+  clearTimeout(geoTimer);
+  if (f.length < 3) return;
+  const seq = ++geoSeq;
+  geoTimer = setTimeout(async () => {
+    try {
+      const c = map.getCenter();
+      const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=14,49,28.5,60&lang=${lang === "lt" ? "default" : "en"}`);
+      const j = await r.json(); if (seq !== geoSeq) return;
+      const seen = new Set(local.map(x => x.label));
+      const remote = (j.features || []).map(ft => { const p = ft.properties || {};
+        const name = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || p.city;
+        const sub = [p.name && p.street ? [p.street, p.housenumber].filter(Boolean).join(" ") : "", p.city && p.city !== name ? p.city : "", p.country].filter(Boolean).join(", ");
+        return name && { kind: "place", label: name, sub, pos: [ft.geometry.coordinates[1], ft.geometry.coordinates[0]] }; })
+        .filter(x => x && !seen.has(x.label) && (seen.add(x.label), true));
+      renderSuggest([...mine, ...local, ...remote]);
+    } catch { /* offline: local towns are still listed */ }
+  }, 280);
+}
+function openRouteForm(field = "to") {
+  $("routeForm").hidden = false; document.documentElement.classList.add("route-open");
+  $("rFrom").value = fieldLabel(rFromSel); $("rTo").value = rToSel ? rToSel.label : "";
+  activeField = field; const inp = field === "from" ? $("rFrom") : $("rTo");
+  inp.focus(); inp.select();   // focus inside the tap itself, or iPhones won't open the keyboard
+  suggestFor(field === "to" ? inp.value : "");
+  if (isPhone() && sheetState !== "peek") snapSheet("peek");
+}
+function closeRouteForm() { $("routeForm").hidden = true; document.documentElement.classList.remove("route-open"); document.activeElement?.blur?.(); }
+$("routeBar").onclick = () => openRouteForm("to");
+$("routeClose").onclick = closeRouteForm;
+for (const [id, field] of [["rFrom", "from"], ["rTo", "to"]]) {
+  $(id).addEventListener("focus", () => { activeField = field; suggestFor(field === "from" && $(id).value === fieldLabel(rFromSel) ? "" : $(id).value); });
+  $(id).addEventListener("input", () => suggestFor($(id).value));
+  $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); if (sgItems[0]) pickSuggestion(sgItems[0]); } if (e.key === "Escape") closeRouteForm(); });
+}
+$("rSuggest").addEventListener("pointerdown", e => e.preventDefault());   // keep the keyboard open while tapping
+$("rSuggest").addEventListener("click", e => { const b = e.target.closest(".sg"); if (b) pickSuggestion(sgItems[+b.dataset.n]); });
+function pickSuggestion(s) {
+  if (activeField === "from") { rFromSel = s; $("rFrom").value = fieldLabel(s); if (!rToSel) { activeField = "to"; $("rTo").focus(); suggestFor(""); return; } }
+  else { rToSel = s.kind === "me" || s.kind === "home" ? { ...s, label: fieldLabel(s) } : s; $("rTo").value = rToSel.label; }
+  if (rToSel) planRoute();
+}
+async function resolvePlace(s) {
+  if (s.kind === "me") { const p = userPos || await getMyLocation(); return p && { pos: p, label: T().myLocation, kind: "me" }; }
+  if (s.kind === "home") return homeLoc && { pos: homeLoc, label: T().homeLbl, kind: "home" };
+  return { pos: s.pos, label: s.label, kind: "place" };
+}
+function setRouteTxt() {
+  $("routeTxt").innerHTML = route ? `<b>${esc(route.from.kind === "me" ? T().myLocation : route.from.kind === "home" ? T().homeLbl : route.from.label)}</b><i>→</i><b>${esc(route.to.label)}</b>`
+    : `<span class="ph">${T().whereTo}</span>`;
+}
+const fmtKm = d => `${Math.round(d)} km`;
+const fmtDur = s => { const m = Math.round(s / 60), hh = Math.floor(m / 60); return hh ? `${hh} h ${m % 60} min` : `${m} min`; };
+async function planRoute() {
+  closeRouteForm();
+  const from = await resolvePlace(rFromSel), to = await resolvePlace(rToSel);
+  if (!from) { toast(T().routeNoFrom); openRouteForm("from"); return; }
+  if (!to) return;
+  toast(T().routing, 10000);
+  let coords, dist, dur, approx = false;
+  try {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 12000);
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.pos[1]},${from.pos[0]};${to.pos[1]},${to.pos[0]}?overview=full&geometries=geojson`, { signal: ctl.signal });
+    clearTimeout(tm);
+    const rt = (await r.json()).routes[0];
+    coords = rt.geometry.coordinates; dist = rt.distance / 1000; dur = rt.duration;
+    $("toast").hidden = true;
+  } catch {
+    approx = true;
+    coords = Array.from({ length: 61 }, (_, k) => [from.pos[1] + (to.pos[1] - from.pos[1]) * k / 60, from.pos[0] + (to.pos[0] - from.pos[0]) * k / 60]);
+    dist = km(from.pos[0], from.pos[1], to.pos[0], to.pos[1]) * ROAD_FACTOR; dur = dist / 70 * 3600;
+    toast(T().routeFail);
+  }
+  route = { from, to, coords, dist, dur, approx };
+  document.documentElement.classList.add("route-on");
+  setRouteTxt();
+  $("routeClear").hidden = false;
+  $("originChips").parentElement.hidden = true;
+  if (closeDetail && selected != null) closeDetail();
+  map.getSource("route")?.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} });
+  map.getSource("me")?.setData({ type: "FeatureCollection", features: [
+    { type: "Feature", geometry: { type: "Point", coordinates: [from.pos[1], from.pos[0]] }, properties: { kind: from.kind === "home" ? "home" : "me" } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [to.pos[1], to.pos[0]] }, properties: { kind: "dest" } }] });
+  map.getSource("links")?.setData({ type: "FeatureCollection", features: [] });
+  routeBest();
+  const b = new maplibregl.LngLatBounds(coords[0], coords[0]); coords.forEach(c => b.extend(c));
+  map.fitBounds(b, { padding: { top: 110, bottom: isPhone() ? window.innerHeight * 0.55 : 60, left: isPhone() ? 40 : 440, right: 40 }, maxZoom: 13, pitch: 0, bearing: 0 });
+}
+function routeBest() {
+  if (!route) return;
+  if (isPhone() && sheetState === "peek") snapSheet("half");
+  const t = T(), kwh = +$("kwh").value, pts = route.coords;
+  // points along the road roughly every 300 m, with the distance driven so far
+  const samp = [[pts[0][0], pts[0][1], 0]]; let run = 0;
+  for (let k = 1; k < pts.length; k++) {
+    run += km(pts[k - 1][1], pts[k - 1][0], pts[k][1], pts[k][0]);
+    if (run - samp[samp.length - 1][2] >= 0.3 || k === pts.length - 1) samp.push([pts[k][0], pts[k][1], run]);
+  }
+  const scale = route.approx ? route.dist / Math.max(run, 0.1) : 1;
+  let minLo = 180, maxLo = -180, minLa = 90, maxLa = -90;
+  for (const [lo, la] of samp) { minLo = Math.min(minLo, lo); maxLo = Math.max(maxLo, lo); minLa = Math.min(minLa, la); maxLa = Math.max(maxLa, la); }
+  const pad = 0.05;
+  const cand = [];
+  for (const l of L) {
+    if (l.la < minLa - pad || l.la > maxLa + pad || l.lo < minLo - pad * 1.8 || l.lo > maxLo + pad * 1.8) continue;
+    if (fastOnly && !isFast(l)) continue;
+    const pr = priceOf(l); if (pr.p == null || pr.p <= 0) continue;
+    const cosLa = Math.cos(l.la * Math.PI / 180); let best = Infinity, at = 0;
+    for (const [lo, la, d] of samp) { const dx = (lo - l.lo) * cosLa, dy = la - l.la, dd = dx * dx + dy * dy; if (dd < best) { best = dd; at = d; } }
+    const off = Math.sqrt(best) * 111.2;
+    if (off <= CORRIDOR_KM) cand.push({ l, off, at: at * scale, ...pr, c: tripCost(off, pr.p, kwh) });
+  }
+  const head = `<div class="res-head">${t.alongHead(fmtKm(route.dist), fmtDur(route.dur))}</div>`;
+  if (!cand.length) { $("results").innerHTML = head + `<div class="note">${t.noneAlong}</div>`; pinned = new Set(); refreshMap(false); return; }
+  // what most drivers would do: stop at the first charger right by the road
+  const byRoad = cand.filter(x => x.off <= 1); const first = (byRoad.length ? byRoad : cand).reduce((a, b) => b.at < a.at ? b : a);
+  cand.sort((a, b) => a.c.total - b.c.total);
+  const top = [];
+  for (const x of cand) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
+  pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
+  lastPicks = new Map(top.map(x => [x.l.i, { op: x.o.op, total: x.c.total, save: Math.max(0, first.c.total - x.c.total) }]));
+  $("results").innerHTML = head + top.map((x, n) => {
+    const s = first.c.total - x.c.total;
+    return pickHTML(x, n, t.alongMeta(Math.round(x.at), x.off) + (s > 0.2 ? ` · <em>${t.saves(money(s))}</em>` : ""));
+  }).join("");
+  wirePicks();
+}
+function clearRoute() {
+  route = null; document.documentElement.classList.remove("route-on");
+  rToSel = null; setRouteTxt(); $("routeClear").hidden = true;
+  $("originChips").parentElement.hidden = false;
+  map.getSource("route")?.setData({ type: "FeatureCollection", features: [] });
+  setOriginMarker(null); pinned = new Set(); lastPicks = new Map(); refreshMap(false);
+  $("results").innerHTML = ""; document.querySelector(".legend").hidden = false;
+  requestAnimationFrame(() => snapSheet(sheetState, false));
+}
+$("routeClear").onclick = clearRoute;
+
 // ---------- home & car settings ----------
 function openCar() {
   const t = T();
-  $("carName").textContent = myCar ? carLabel(myCar) : t.carNone;
   $("acctBox").hidden = !authUser;
   if (authUser) $("acctName").textContent = t.signedInAs(authUser.displayName || authUser.email || "");
   $("homeStatus").textContent = homeLoc ? t.homeSet(townOf({ la: homeLoc[0], lo: homeLoc[1] })) : t.homeNotSet;
@@ -434,7 +664,6 @@ function setHome(pos) {
   $("origin").value = "home"; store.set("origin", "home");
   setOriginMarker(homeLoc, "home"); openCar(); toast(T().homeSaved);
 }
-$("carBtn").onclick = openCar;
 $("homeHere").onclick = async () => { const p = await getMyLocation(); if (p) setHome(p); };
 $("homeCentre").onclick = () => { const c = map.getCenter(); setHome([c.lat, c.lng]); };
 $("homeClear").onclick = () => { homeLoc = null; store.set("home", null); if ($("origin").value === "home") $("origin").value = "me"; setOriginMarker(null); openCar(); };
@@ -442,7 +671,7 @@ $("carSave").onclick = () => {
   const num = (id, d, lo, hi) => { const v = parseFloat(String($(id).value).replace(",", ".")); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
   car = { cons: num("cons", CAR_DEFAULTS.cons, 8, 40), wear: num("wear", CAR_DEFAULTS.wear, 0, 1), timeVal: num("timeVal", CAR_DEFAULTS.timeVal, 0, 200) };
   store.set("car", car); $("carModal").hidden = true;
-  if ($("results").innerHTML) bestCharge();
+  if ($("results").innerHTML) rerun();
 };
 $("carModal").addEventListener("click", e => { if (e.target.id === "carModal") $("carModal").hidden = true; });
 
@@ -559,7 +788,7 @@ function liquidSeg(host, options, value, onChange) {
 }
 function buildFastSeg() {
   liquidSeg($("fastSeg"), [{ value: "all", label: T().allChargers }, { value: "fast", label: T().fastChargers }], fastOnly ? "fast" : "all", v => {
-    fastOnly = v === "fast"; store.set("fastOnly", fastOnly); refreshMap(); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false);
+    fastOnly = v === "fast"; store.set("fastOnly", fastOnly); refreshMap(); if ($("results").innerHTML) rerun(); if (selected != null) select(selected, false);
   });
 }
 function buildKwhSeg() {
@@ -643,7 +872,8 @@ sheet.addEventListener("click", ev => { if (performance.now() < suppressClickUnt
   $("grab").addEventListener("click", () => snapSheet(sheetState === "peek" ? "half" : sheetState === "half" ? "full" : "peek"));
   $("grab").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("grab").click(); } });
 })();
-map.on("dragstart", () => { if (isPhone() && sheetState !== "peek") snapSheet("peek"); });
+map.on("dragstart", () => { if (!$("routeForm").hidden) closeRouteForm();
+ if (isPhone() && sheetState !== "peek") snapSheet("peek"); });
 window.addEventListener("resize", () => snapSheet(sheetState, false));
 new ResizeObserver(() => { if (!document.documentElement.classList.contains("sheet-moving")) snapSheet(sheetState, false); }).observe(sheet);
 
@@ -696,7 +926,7 @@ function openOnboard(changing = false) {
   $("carSearch").value = ""; renderCarList(); loadCars();
   setTimeout(() => $("carSearch").focus(), 50);
 }
-function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) openCar(); else flyIntoLithuania(); }
+function finishOnboard() { store.set("onboarded", true); $("onboard").hidden = true; if ($("onboard").dataset.changing) renderAccount(); else flyIntoLithuania(); }
 function setKwhOptions() {
   const prev = $("kwh").value;
   let auto = myCar && myCar[4] ? Math.round(myCar[4] * 0.7) : null;
@@ -714,11 +944,10 @@ $("carList").addEventListener("click", async e => {
   myCar = c; store.set("myCar", c);
   if (c[5]) { car = { ...car, cons: c[5] }; store.set("car", car); }
   store.set("kwhAuto", true); setKwhOptions(); refreshMap(); toast(T().carSaved);
-  if ($("results").innerHTML) bestCharge();
+  if ($("results").innerHTML) rerun();
   finishOnboard();
 });
 $("carSkip").onclick = finishOnboard;
-$("carChange").onclick = () => { $("carModal").hidden = true; openOnboard(true); };
 
 // ---------- sign-in (Firebase Auth; only active when FIREBASE_CONFIG is set) ----------
 let authUser = null;
@@ -752,11 +981,14 @@ function applyLang() {
   $("origin").innerHTML = `<option value="me">${T().originMe}</option><option value="home">${T().originHome}</option>` +
     CITIES.map(c => `<option value="${c.id}">${c.en}</option>`).join("");
   $("origin").value = store.get("origin", homeLoc ? "home" : "me");
-  buildOriginChips();
+  buildOriginChips(); buildTabs();
+  $("rFrom").placeholder = T().fromPh; $("rTo").placeholder = T().toPh;
+  setRouteTxt();
+  renderAccount();
   $("infoBody").innerHTML = T().about + `<button class="secondary" id="infoClose">${T().close}</button>`;
   $("infoClose").onclick = () => $("infoModal").hidden = true;
   setUpdated(); updateStats();
-  if (L.length) { refreshMap(); if (selected != null) select(selected, false); if ($("results").innerHTML) bestCharge(); }
+  if (L.length) { refreshMap(); if (selected != null) select(selected, false); if ($("results").innerHTML) rerun(); }
 }
 function setUpdated() {
   if (!DATA) return;
@@ -765,12 +997,12 @@ function setUpdated() {
 }
 function setChips() { $("unkChip").classList.toggle("on", hideUnknown); }
 $("langBtn").onclick = () => { lang = lang === "lt" ? "en" : "lt"; store.set("lang", lang); applyLang(); };
-$("infoBtn").onclick = () => $("infoModal").hidden = false;
+$("infoBtn").onclick = () => { $("carModal").hidden = true; $("infoModal").hidden = false; };
 $("infoModal").addEventListener("click", e => { if (e.target.id === "infoModal") $("infoModal").hidden = true; });
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
-$("bestBtn").onclick = bestCharge;
+$("bestBtn").onclick = () => route ? routeBest() : bestCharge();
 $("origin").onchange = () => { store.set("origin", $("origin").value); buildOriginChips(); bestCharge(); };
-$("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) bestCharge(); if (selected != null) select(selected, false); };
+$("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) rerun(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
 applyLang(); setChips(); setKwhOptions(); initAuth(); requestAnimationFrame(() => snapSheet("half", false));
