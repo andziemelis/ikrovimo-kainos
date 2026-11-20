@@ -593,3 +593,25 @@ html.tab-account .top,html.tab-account .panel,html.tab-account .fab{display:none
 .page:not([hidden]) > :nth-child(4){animation-delay:.18s}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.page:not([hidden]) > *{animation:none}}
+
+/* ===== How to pay (station card) ===== */
+.pay{margin:14px 0 6px;padding:14px;border-radius:20px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}
+.pay-h{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8f9bb0;margin-bottom:10px}
+.pay-op + .pay-op{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.pay-top{display:flex;align-items:center;gap:12px}
+.pay-ic{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;font-weight:800;font-size:16px;color:#dfe8ff;
+  background:linear-gradient(135deg,rgba(61,107,255,.5),rgba(42,51,217,.5));box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.pay-name{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.pay-name b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pay-name em{font-style:normal;font-size:12.5px;color:var(--muted);line-height:1.3}
+.pay-btn{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:12px;font-weight:700;font-size:13.5px;
+  color:#fff;text-decoration:none;background:linear-gradient(135deg,#3d6bff,#2a33d9);box-shadow:0 6px 18px rgba(61,107,255,.35);white-space:nowrap}
+.pay-btn:active{transform:scale(.96)}
+.pay-alt{margin:10px 0 0 50px;font-size:13px;color:#c5d3f5}
+.pay-alt span{color:var(--muted)}
+.pay-alt ul{margin:4px 0 0;padding-left:16px}
+.pay-alt li{margin:2px 0}
+.pay-note{margin-top:10px;font-size:12px;color:var(--muted)}
+.pay-top{display:grid;grid-template-columns:38px minmax(0,1fr);column-gap:12px;align-items:center}
+.pay-btn{grid-column:2;justify-self:start;margin-top:10px}
+.pay-alt{margin-left:50px}

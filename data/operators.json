@@ -1,0 +1,15 @@
+{
+  "_about": "How to pay at each operator. 'match' is compared (lowercase, contains) with the operator name in lt.json. 'ios' = App Store id, 'play' = Google Play search term, 'web' = operator page. 'adhoc' = ways to pay without the operator's app: card (bank card at the charger, where it has a reader), qr (scan the QR code on the charger with the phone camera), noreg (some stations take payment without registering). Only add what the operator itself states.",
+  "operators": [
+    { "match": ["in balance grid", "inbalance"], "app": "Inbalance grid", "ios": "1529276995", "play": "Inbalance grid", "adhoc": ["noreg"] },
+    { "match": ["ignitis"], "app": "Ignitis ON", "ios": "1372828413", "play": "Ignitis ON", "web": "https://ignitison.lt/", "inApp": "wallets" },
+    { "match": ["eldrive"], "app": "Eldrive", "ios": "1598574194", "play": "Eldrive", "adhoc": ["card"] },
+    { "match": ["stova", "unipark"], "app": "UNIPARK", "ios": "1195004063", "play": "UNIPARK", "web": "https://unipark.lt/" },
+    { "match": ["enefit"], "app": "Enefit Volt", "ios": "1495964264", "play": "Enefit Volt", "web": "https://www.enefit.lt/", "adhoc": ["card"] },
+    { "match": ["įkrautas", "ikrautas"], "app": "Įkrautas", "ios": "1579030515", "play": "Įkrautas" },
+    { "match": ["elektrum"], "app": "Elektrum Drive", "ios": "1591100594", "play": "Elektrum Drive" },
+    { "match": ["eleport"], "app": "Eleport App", "ios": "6741322265", "play": "Eleport", "web": "https://eleport.com/lt/", "adhoc": ["qr"] },
+    { "match": ["ionity"], "app": "IONITY", "ios": "1551448692", "play": "IONITY", "web": "https://www.ionity.eu/lt/app" },
+    { "match": ["stuart"], "app": "STUART", "play": "Stuart Energy", "web": "https://stuart.energy/software-products/stuart-application", "inApp": "unsure" }
+  ]
+}

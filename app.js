@@ -255,6 +255,7 @@ function select(i, fly = true) {
       <button class="swipe-thumb" id="swipeThumb" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
     <div class="via">${app ? `${t.viaApp(NAV_NAMES[app])} · <button class="linkbtn" id="changeApp">${t.changeLbl}</button>` : ""}</div>
+    ${payHTML(l)}
     ${l.offers.length > 1 ? `<div class="inf">${t.manyCompanies(l.offers.length, priced)}</div>` : ""}
     ${l.offers.some(x => x.pk) ? `<div class="warn">${t.parkingWarn}</div>` : ""}
     ${l.offers.some(x => x.fx) ? `<div class="warn">${t.fixedWarn}</div>` : ""}
@@ -266,6 +267,7 @@ function select(i, fly = true) {
   $("dClose").onclick = closeDetail;
   if ($("changeApp")) $("changeApp").onclick = () => { store.set("navApp", null); navigate(l); };
   setupSwipe(l);
+  $("detail").querySelectorAll("[data-pay]").forEach(a => a.addEventListener("click", () => logCharge(l.i)));
   if (fly) cinematicTo(l);
 }
 function closeDetail() { requestAnimationFrame(() => snapSheet(sheetState)); selected = null; refreshMap(false); $("detail").hidden = true; $("home").hidden = false; $("home").classList.remove("enter"); void $("home").offsetWidth; $("home").classList.add("enter"); }
@@ -292,6 +294,33 @@ for (const [id, key] of [["navGoogle", "google"], ["navWaze", "waze"], ["navAppl
   $(id).addEventListener("click", () => { if (navTarget) logCharge(navTarget.i); store.set("navApp", key); $("navModal").hidden = true; });
 $("navCancel").onclick = () => $("navModal").hidden = true;
 $("navModal").addEventListener("click", e => { if (e.target.id === "navModal") $("navModal").hidden = true; });
+
+// ---------- how to pay: hand off to the operator's own app, or its no-app payment ----------
+// The operator list (data/operators.json) is kept by hand from what each operator states publicly.
+let OPS = [];
+fetch("data/operators.json", { cache: "no-cache" }).then(r => r.json()).then(j => { OPS = j.operators || []; if (selected != null) select(selected, false); }).catch(() => {});
+const PLATFORM = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(navigator.userAgent) ? "android" : "desktop";
+const opInfo = name => { const n = String(name).toLowerCase(); return OPS.find(o => o.match.some(m => n.includes(m))); };
+function appLink(o) {
+  const ios = o.ios && `https://apps.apple.com/lt/app/id${o.ios}`, play = o.play && `https://play.google.com/store/search?q=${encodeURIComponent(o.play)}&c=apps`;
+  return PLATFORM === "ios" ? ios || o.web : PLATFORM === "android" ? play || o.web : o.web || ios || play;
+}
+function payHTML(l) {
+  const t = T(), seen = new Set(), rows = [];
+  for (const x of l.offers) {
+    if (seen.has(x.op)) continue; seen.add(x.op);
+    const o = opInfo(x.op), href = o && appLink(o);
+    const ways = (o?.adhoc || []).map(k => `<li>${t["adhoc_" + k]}</li>`).join("");
+    rows.push(`<div class="pay-op">
+      <div class="pay-top"><span class="pay-ic" aria-hidden="true">${esc(String(x.op).trim().slice(0, 1).toUpperCase())}</span>
+        <span class="pay-name"><b>${esc(x.op)}</b><em>${!o ? t.payUnknown : o.inApp === "wallets" ? t.payInAppWallets : o.inApp === "unsure" ? t.payOpApp : t.payInApp}</em></span>
+        ${href ? `<a class="pay-btn" data-pay href="${href}" target="_blank" rel="noopener">${t.payIn(esc(o.app))}</a>` : ""}</div>
+      ${ways ? `<div class="pay-alt"><span>${t.payNoApp}</span><ul>${ways}</ul></div>` : ""}
+    </div>`);
+  }
+  const anyApp = rows.length && l.offers.some(x => opInfo(x.op) && appLink(opInfo(x.op)));
+  return `<div class="pay"><div class="pay-h">${t.payTitle}</div>${rows.join("")}${anyApp && PLATFORM !== "desktop" ? `<div class="pay-note">${t.payStoreNote}</div>` : ""}</div>`;
+}
 
 // ---------- swipe to navigate (like "swipe to send" in payment apps) ----------
 function setupSwipe(l) {
