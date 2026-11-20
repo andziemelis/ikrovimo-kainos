@@ -546,3 +546,50 @@ html.tab-account .top,html.tab-account .panel,html.tab-account .fab{display:none
 
 .row[hidden],.legend[hidden]{display:none!important}
 @media (min-width:760px){.page{bottom:auto!important;max-height:calc(100dvh - 112px)}}
+
+/* ===== Tab bar: own design, solid (no glass). A glowing charge bar crawls to the open tab,
+   light falls from it onto the tab, and the open tab's icon draws itself. ===== */
+.tabs{position:relative;display:flex;height:66px;border-radius:24px;overflow:hidden;
+  background:linear-gradient(180deg,#141823,#0d1017);border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 14px 36px rgba(0,0,0,.6)}
+.tab{flex:1;position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  border:0;background:none;color:#6f7a8e;font:700 11.5px/1 inherit;font-family:inherit;letter-spacing:.01em;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:color .35s}
+.tab.on{color:#e2eaff}
+.tab .tl{transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.tab.on .tl{transform:translateY(1px)}
+.ti{display:block;overflow:visible;transition:transform .18s}
+.tab:active .ti{transform:scale(.86)}
+.ti-s{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round;stroke-linecap:round}
+.tab.on .ti-s{stroke:#d6e1ff}
+.ti .fold,.ti .head{transform-box:fill-box}
+.ti .fold{transform-origin:left center}
+.ti .head{transform-origin:center}
+.ti .pin{fill:#9db8ff;opacity:0;transform:translateY(-8px);transform-box:fill-box;transform-origin:50% 100%;transition:opacity .25s,transform .25s;filter:drop-shadow(0 0 4px rgba(157,184,255,.8))}
+.tab.on .pin{opacity:1;transform:none}
+.tab.draw .ti-s{stroke-dasharray:1;animation:tDraw .6s cubic-bezier(.5,0,.2,1) both}
+.tab.draw .fold{animation:tDraw .6s cubic-bezier(.5,0,.2,1) both,tUnfold .55s cubic-bezier(.3,1.3,.5,1) both}
+.tab.draw .f2{animation-delay:.07s,.07s}
+.tab.draw .f3{animation-delay:.14s,.14s}
+.tab.draw .pin{animation:tPin .55s cubic-bezier(.3,1.5,.5,1) .34s both}
+.tab.draw .head{animation:tDraw .45s cubic-bezier(.5,0,.2,1) both,tPop .5s cubic-bezier(.3,1.6,.5,1) .3s both}
+.tab.draw .body{animation-delay:.12s}
+@keyframes tDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes tUnfold{from{transform:scaleX(.2)}to{transform:none}}
+@keyframes tPin{0%{opacity:0;transform:translateY(-10px) scale(.5)}60%{opacity:1;transform:translateY(1px) scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes tPop{0%{transform:none}45%{transform:scale(1.28)}100%{transform:none}}
+.tab-bar{position:absolute;top:0;height:3px;z-index:3;border-radius:0 0 4px 4px;
+  background:linear-gradient(90deg,#2f5bff,#b9ccff,#2f5bff) 0 0/200% 100%;
+  box-shadow:0 0 14px rgba(77,118,255,.95),0 0 4px #b9ccff;animation:tFlow 2.2s linear infinite}
+@keyframes tFlow{to{background-position:-200% 0}}
+.tab-beam{position:absolute;top:0;left:0;width:110px;height:100%;z-index:1;pointer-events:none;
+  background:radial-gradient(55% 80% at 50% 0%,rgba(61,107,255,.32),rgba(61,107,255,.06) 55%,transparent 75%)}
+@media (prefers-reduced-motion: reduce){.tab-bar{animation:none}.tab.draw *{animation:none!important}}
+
+/* Account page: sections rise in one after another */
+.page:not([hidden]) > *{animation:rise .55s cubic-bezier(.22,1,.36,1) both}
+.page:not([hidden]) > :nth-child(2){animation-delay:.06s}
+.page:not([hidden]) > :nth-child(3){animation-delay:.12s}
+.page:not([hidden]) > :nth-child(4){animation-delay:.18s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.page:not([hidden]) > *{animation:none}}

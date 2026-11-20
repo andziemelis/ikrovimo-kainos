@@ -376,15 +376,12 @@ function getMyLocation() {
     }, () => { toast(T().locFailed); resolve(null); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
   });
 }
+// Best Charge always starts from where you are now. Without location access it uses the map centre.
 async function getOrigin() {
-  const v = $("origin").value, t = T();
-  if (v === "me") { const p = userPos || await getMyLocation(); return p && { pos: p, label: t.originMeShort, kind: "me" }; }
-  if (v === "home") {
-    if (!homeLoc) { toast(t.needHome); openCar(); return null; }
-    return { pos: homeLoc, label: t.originHomeShort, kind: "home" };
-  }
-  const c = CITIES.find(x => x.id === v);
-  return { pos: c.c, label: c.en, kind: "city" };
+  const p = userPos || await getMyLocation();
+  if (p) return { pos: p, label: T().originMeShort, kind: "me" };
+  const c = map.getCenter(); toast(T().usingCentre, 4000, T().usingCentreSub);
+  return { pos: [c.lat, c.lng], label: T().mapCentre, kind: "city" };
 }
 
 // ---------- Best Charge ----------
@@ -458,14 +455,43 @@ $("walletModal").addEventListener("click", e => { if (e.target.id === "walletMod
 
 // ---------- tabs: Map and Account ----------
 let tab = "map";
+// Icons are drawn with strokes so the open tab can draw itself in. The map unfolds and drops a pin;
+// the person's head pops in. A glowing "charge" bar on top crawls to the open tab like an inchworm.
 const TAB_ICONS = {
-  map: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5zM9 4v13.5M15 6.5V20"/></svg>',
-  account: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7.5 8c.6-3.4 3.7-5.5 7.5-5.5s6.9 2.1 7.5 5.5"/></svg>' };
+  map: `<svg class="ti ti-map" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+    <path class="ti-s fold f1" pathLength="1" d="M3 6.5 9 4v14l-6 2.5z"/><path class="ti-s fold f2" pathLength="1" d="M9 4l6 2.5v14L9 18z"/><path class="ti-s fold f3" pathLength="1" d="M15 6.5 21 4v14l-6 2.5z"/>
+    <g class="pin"><path d="M15 2.2a3.1 3.1 0 0 0-3.1 3.1c0 2.3 3.1 5.6 3.1 5.6s3.1-3.3 3.1-5.6A3.1 3.1 0 0 0 15 2.2z"/><circle cx="15" cy="5.3" r="1.1"/></g></svg>`,
+  account: `<svg class="ti ti-acct" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+    <circle class="ti-s head" pathLength="1" cx="12" cy="8" r="3.8"/><path class="ti-s body" pathLength="1" d="M4.5 20.5c.7-3.6 3.8-5.8 7.5-5.8s6.8 2.2 7.5 5.8"/></svg>` };
 function buildTabs() {
-  liquidSeg($("tabSeg"), ["map", "account"].map(v => ({ value: v, label: `${TAB_ICONS[v]}<span>${v === "map" ? T().tabMap : T().tabAccount}</span>` })), tab, setTab);
+  $("tabs").innerHTML = '<span class="tab-bar" id="tabBar" aria-hidden="true"></span><span class="tab-beam" id="tabBeam" aria-hidden="true"></span>' +
+    ["map", "account"].map(v => `<button type="button" class="tab${v === tab ? " on" : ""}" role="tab" data-v="${v}" aria-selected="${v === tab}">${TAB_ICONS[v]}<span class="tl">${v === "map" ? T().tabMap : T().tabAccount}</span></button>`).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.v));
+  requestAnimationFrame(() => placeTabBar(false));
 }
+let barLeft = null;
+function placeTabBar(animate = true) {
+  const host = $("tabs"), btn = host.querySelector(`.tab[data-v="${tab}"]`), bar = $("tabBar"), beam = $("tabBeam");
+  if (!btn) return;
+  const hr = host.getBoundingClientRect(), r = btn.getBoundingClientRect(), w = 34;
+  const left = r.left - hr.left + r.width / 2 - w / 2, right = hr.width - left - w;
+  const moveRight = barLeft != null && left > barLeft, go = animate && !REDUCED_MOTION && barLeft != null && left !== barLeft;
+  // inchworm: the leading end shoots ahead, the trailing end catches up
+  bar.style.transition = go ? (moveRight ? "right .28s cubic-bezier(.3,.9,.3,1), left .42s cubic-bezier(.5,0,.2,1) .12s" : "left .28s cubic-bezier(.3,.9,.3,1), right .42s cubic-bezier(.5,0,.2,1) .12s") : "none";
+  bar.style.left = `${left}px`; bar.style.right = `${right}px`;
+  beam.style.transition = go ? "transform .5s cubic-bezier(.3,.9,.3,1) .1s, opacity .3s" : "none";
+  beam.style.transform = `translateX(${r.left - hr.left + r.width / 2 - beam.offsetWidth / 2}px)`;
+  barLeft = left;
+}
+window.addEventListener("resize", () => placeTabBar(false));
 function setTab(v) {
+  if (v === tab && $("tabs").querySelector(".tab.on")?.dataset.v === v) return;
   tab = v;
+  $("tabs").querySelectorAll(".tab").forEach(b => {
+    const on = b.dataset.v === v; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on));
+    b.classList.remove("draw"); if (on && !REDUCED_MOTION) { void b.offsetWidth; b.classList.add("draw"); }
+  });
+  placeTabBar(true);
   document.documentElement.classList.toggle("tab-account", v === "account");
   $("accountPage").hidden = v !== "account";
   if (v === "account") { closeRouteForm(); renderAccount(); $("accountPage").scrollTop = 0; }
@@ -588,7 +614,6 @@ async function planRoute() {
   document.documentElement.classList.add("route-on");
   setRouteTxt();
   $("routeClear").hidden = false;
-  $("originChips").parentElement.hidden = true;
   if (closeDetail && selected != null) closeDetail();
   map.getSource("route")?.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} });
   map.getSource("me")?.setData({ type: "FeatureCollection", features: [
@@ -641,7 +666,6 @@ function routeBest() {
 function clearRoute() {
   route = null; document.documentElement.classList.remove("route-on");
   rToSel = null; setRouteTxt(); $("routeClear").hidden = true;
-  $("originChips").parentElement.hidden = false;
   map.getSource("route")?.setData({ type: "FeatureCollection", features: [] });
   setOriginMarker(null); pinned = new Set(); lastPicks = new Map(); refreshMap(false);
   $("results").innerHTML = ""; document.querySelector(".legend").hidden = false;
@@ -661,12 +685,11 @@ function openCar() {
 }
 function setHome(pos) {
   homeLoc = [+pos[0].toFixed(5), +pos[1].toFixed(5)]; store.set("home", homeLoc);
-  $("origin").value = "home"; store.set("origin", "home");
   setOriginMarker(homeLoc, "home"); openCar(); toast(T().homeSaved);
 }
 $("homeHere").onclick = async () => { const p = await getMyLocation(); if (p) setHome(p); };
 $("homeCentre").onclick = () => { const c = map.getCenter(); setHome([c.lat, c.lng]); };
-$("homeClear").onclick = () => { homeLoc = null; store.set("home", null); if ($("origin").value === "home") $("origin").value = "me"; setOriginMarker(null); openCar(); };
+$("homeClear").onclick = () => { homeLoc = null; store.set("home", null); setOriginMarker(null); openCar(); };
 $("carSave").onclick = () => {
   const num = (id, d, lo, hi) => { const v = parseFloat(String($(id).value).replace(",", ".")); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
   car = { cons: num("cons", CAR_DEFAULTS.cons, 8, 40), wear: num("wear", CAR_DEFAULTS.wear, 0, 1), timeVal: num("timeVal", CAR_DEFAULTS.timeVal, 0, 200) };
@@ -878,19 +901,11 @@ window.addEventListener("resize", () => snapSheet(sheetState, false));
 new ResizeObserver(() => { if (!document.documentElement.classList.contains("sheet-moving")) snapSheet(sheetState, false); }).observe(sheet);
 
 // floating "my location" button: start from where you are and show it
-$("locBtn").onclick = () => { $("origin").value = "me"; $("origin").dispatchEvent(new Event("change")); };
-
-// ---------- quick start-point chips (like Home / Work in Waze) ----------
-function buildOriginChips() {
-  const opts = [...$("origin").options];
-  $("originChips").innerHTML = opts.map(o => `<button type="button" role="radio" class="qchip${o.value === $("origin").value ? " on" : ""}" data-v="${o.value}" aria-checked="${o.value === $("origin").value}">${
-    o.value === "me" ? '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M21 3 3 10.5l7.2 2.3L12.5 20z" fill="currentColor"/></svg>' :
-    o.value === "home" ? '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z" fill="currentColor"/></svg>' : ""}${o.textContent}</button>`).join("");
-}
-$("originChips").addEventListener("click", e => {
-  const b = e.target.closest("[data-v]"); if (!b) return;
-  $("origin").value = b.dataset.v; $("origin").dispatchEvent(new Event("change"));
-});
+$("locBtn").onclick = async () => {
+  const p = await getMyLocation(); if (!p) return;
+  if (!route) setOriginMarker(p, "me");
+  map.flyTo({ center: [p[1], p[0]], zoom: Math.max(map.getZoom(), 13), duration: REDUCED_MOTION ? 0 : 1200 });
+};
 
 // ---------- floating stats card ----------
 function ltCount(n, one, few, many) { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && (b < 10 || b > 20) ? few : many; }
@@ -978,10 +993,7 @@ function applyLang() {
   $("carSearch").placeholder = T().carSearchPh;
   if ($("kwh").options.length) setKwhOptions();
   if (!$("onboard").hidden) renderCarList();
-  $("origin").innerHTML = `<option value="me">${T().originMe}</option><option value="home">${T().originHome}</option>` +
-    CITIES.map(c => `<option value="${c.id}">${c.en}</option>`).join("");
-  $("origin").value = store.get("origin", homeLoc ? "home" : "me");
-  buildOriginChips(); buildTabs();
+  buildTabs();
   $("rFrom").placeholder = T().fromPh; $("rTo").placeholder = T().toPh;
   setRouteTxt();
   renderAccount();
@@ -1001,7 +1013,6 @@ $("infoBtn").onclick = () => { $("carModal").hidden = true; $("infoModal").hidde
 $("infoModal").addEventListener("click", e => { if (e.target.id === "infoModal") $("infoModal").hidden = true; });
 $("unkChip").onclick = () => { hideUnknown = !hideUnknown; store.set("hideUnknown", hideUnknown); setChips(); refreshMap(); };
 $("bestBtn").onclick = () => route ? routeBest() : bestCharge();
-$("origin").onchange = () => { store.set("origin", $("origin").value); buildOriginChips(); bestCharge(); };
 $("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) rerun(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------

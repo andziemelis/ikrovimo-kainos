@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611201518">
+<link rel="stylesheet" href="style.css?v=202611201527">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
@@ -49,10 +49,6 @@
   <div id="home">
     <div class="actions">
       <button class="go" id="bestBtn" data-t="bestCharge"></button>
-    </div>
-    <div class="row">
-      <div class="chiprow" id="originChips" role="radiogroup" aria-label="Start point"></div>
-      <select id="origin" class="sr-only" tabindex="-1" aria-hidden="true"></select>
     </div>
     <div class="row filters">
       <div class="seg" id="fastSeg" role="radiogroup" aria-label="Chargers"></div>
@@ -105,7 +101,7 @@
   <p class="page-foot" id="acctFoot"></p>
 </section>
 
-<nav class="tabbar" id="tabbar" aria-label="Sections"><div class="seg" id="tabSeg" role="radiogroup"></div></nav>
+<nav class="tabbar" id="tabbar" aria-label="Sections"><div class="tabs" id="tabs" role="tablist"></div></nav>
 
 <div class="modal" id="walletModal" hidden>
   <div class="sheet wallet">
@@ -184,7 +180,7 @@
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="i18n.js?v=202611201518"></script>
-<script src="app.js?v=202611201518"></script>
+<script src="i18n.js?v=202611201527"></script>
+<script src="app.js?v=202611201527"></script>
 </body>
 </html>
