@@ -15,10 +15,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=202611270800">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="style.css?v=202611270811">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
@@ -113,6 +111,7 @@
     </div>
     <button class="go" id="addCardBtn"><span aria-hidden="true">+ </span><span data-t="addCard"></span></button>
     <p class="note w-why" data-t="cardWhy"></p>
+    <ul class="w-promise"><li data-t="promiseCancel"></li><li data-t="promiseTrial"></li></ul>
     <div class="w-sub">
       <div><b data-t="subTitle"></b><span data-t="noSub"></span></div>
       <span class="w-tag" data-t="soonTag"></span>
@@ -153,6 +152,8 @@
     <label class="field"><span data-t="timeLbl"></span><input type="number" id="timeVal" min="0" max="100" step="1" inputmode="decimal"><em>€/h</em></label>
     <button class="go" id="carSave" data-t="saveBtn"></button>
     <button class="linkbtn" id="infoBtn" data-t="aboutBtn"></button>
+    <div class="legal-links" id="setLegal"></div>
+    <button class="del-data" id="deleteData" data-t="deleteData"></button>
   </div>
 </div>
 
@@ -173,6 +174,7 @@
     <input id="carSearch" type="search" autocomplete="off" aria-label="Car">
     <div id="carList" class="carlist" role="list"></div>
     <button class="secondary" id="carSkip" data-t="skip"></button>
+    <p class="ob-legal" id="obLegal"></p>
   </div>
 </div>
 
@@ -185,8 +187,8 @@
   <span class="t-tx"><b id="toastT"></b><span id="toastS" hidden></span></span>
 </div>
 
-<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="i18n.js?v=202611270800"></script>
-<script src="app.js?v=202611270800"></script>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="i18n.js?v=202611270811"></script>
+<script src="app.js?v=202611270811"></script>
 </body>
 </html>

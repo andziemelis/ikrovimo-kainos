@@ -1,3 +1,5 @@
+/* Inter is hosted with the site (no request to Google) */
+@font-face{font-family:"Inter";src:url("vendor/fonts/InterVariable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
 :root{
   --free:#0ea5e9; --cheap:#16a34a; --mid:#f59e0b; --high:#dc2626; --unk:#94a3b8;
   --ink:#e8eef6; --muted:#8b9bb0; --line:#243246; --bg:#0f1826; --soft:#1a2638; --card:#141f30; --brand:#3156ff; --brand2:#2a33d9; --accent:#9db8ff; --glow:rgba(61,107,255,.5); --space:#05080f;
@@ -631,3 +633,14 @@ html.tab-account .top,html.tab-account .panel,html.tab-account .fab{display:none
 .w-sub b{font-size:15px}
 .w-sub span{font-size:13px;color:var(--muted)}
 .w-sub .w-tag{flex:none;font-size:12px;font-weight:700;color:#cfdcff;padding:5px 10px;border-radius:999px;background:rgba(61,107,255,.18);border:1px solid rgba(157,184,255,.25)}
+
+/* ===== Legal links, delete my data ===== */
+.legal-links,.ob-legal,.page-foot{font-size:12.5px;color:var(--muted);line-height:1.6}
+.legal-links a,.ob-legal a,.page-foot a{color:#9db8ff;text-decoration:none;font-weight:600}
+.ob-legal{text-align:center;margin:12px 6px 0}
+.legal-links{margin:10px 0 4px}
+.del-data{display:block;width:100%;margin-top:14px;padding:13px;border-radius:14px;border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08);
+  color:#fca5a5;font:700 14px/1.2 inherit;font-family:inherit;cursor:pointer;transition:background .2s}
+.del-data.armed{background:#dc2626;color:#fff;border-color:#dc2626}
+.w-promise{margin:-6px 0 14px;padding-left:18px;font-size:13px;color:#c5d3f5;line-height:1.45}
+.w-promise li{margin:3px 0}

@@ -399,7 +399,7 @@ function setOriginMarker(pos, kind) {
 function getMyLocation() {
   return new Promise(resolve => {
     if (!navigator.geolocation) { toast(T().locFailed); resolve(null); return; }
-    toast(T().locating, 8000);
+    toast(T().locating, 8000, T().locWhy);
     navigator.geolocation.getCurrentPosition(pos => {
       $("toast").hidden = true; userPos = [pos.coords.latitude, pos.coords.longitude]; resolve(userPos);
     }, () => { toast(T().locFailed); resolve(null); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
@@ -479,6 +479,25 @@ $("addCardBtn").onclick = () => toast(T().cardSoon, 4000, T().cardSoonSub);
 $("walletClose").onclick = () => $("walletModal").hidden = true;
 $("walletModal").addEventListener("click", e => { if (e.target.id === "walletModal") $("walletModal").hidden = true; });
 
+// ---------- legal pages and deleting your data ----------
+const legalLinks = () => `<a href="privacy.html" target="_blank" rel="noopener">${T().privacyLink}</a> · <a href="terms.html" target="_blank" rel="noopener">${T().termsLink}</a>`;
+// Two taps, so it can't happen by accident: the first asks, the second deletes everything this app stored on the device.
+let delTimer = 0;
+$("deleteData").onclick = () => {
+  const b = $("deleteData");
+  if (!b.classList.contains("armed")) {
+    b.classList.add("armed"); b.textContent = T().deleteConfirm;
+    clearTimeout(delTimer); delTimer = setTimeout(() => { b.classList.remove("armed"); b.textContent = T().deleteData; }, 5000);
+    return;
+  }
+  try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  location.replace(location.pathname + "?deleted=1");
+};
+if (new URLSearchParams(location.search).has("deleted")) {
+  history.replaceState(null, "", location.pathname);
+  setTimeout(() => toast(T().deletedDone, 4000, T().deletedSub), 400);
+}
+
 // ---------- tabs: Map and Account ----------
 let tab = "map";
 // Icons are drawn with strokes so the open tab can draw itself in. The map unfolds and drops a pin;
@@ -527,7 +546,7 @@ function renderAccount() {
   const t = T();
   $("liCarVal").textContent = myCar ? [myCar[0], myCar[1]].filter(Boolean).join(" ") : t.noCar;
   $("liWalletVal").textContent = t.noCardShort;
-  $("acctFoot").textContent = t.acctFoot;
+  $("acctFoot").innerHTML = `${t.acctFoot}<br>${legalLinks()}`;
   if (authUser) { $("acctHead").textContent = authUser.displayName || authUser.email || ""; $("acctSub").textContent = ""; $("acctBtns").hidden = true; }
 }
 const authSoon = () => FIREBASE_CONFIG ? signIn(new firebase.auth.GoogleAuthProvider()) : toast(T().signInSoon, 3500, T().signInSoonSub);
@@ -570,7 +589,7 @@ function suggestFor(q) {
   geoTimer = setTimeout(async () => {
     try {
       const c = map.getCenter();
-      const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&bbox=14,49,28.5,60&lang=${lang === "lt" ? "default" : "en"}`);
+      const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=${c.lat.toFixed(1)}&lon=${c.lng.toFixed(1)}&bbox=14,49,28.5,60&lang=${lang === "lt" ? "default" : "en"}`);
       const j = await r.json(); if (seq !== geoSeq) return;
       const seen = new Set(local.map(x => x.label));
       const remote = (j.features || []).map(ft => { const p = ft.properties || {};
@@ -1023,7 +1042,9 @@ function applyLang() {
   $("rFrom").placeholder = T().fromPh; $("rTo").placeholder = T().toPh;
   setRouteTxt();
   renderAccount();
-  $("infoBody").innerHTML = T().about + `<button class="secondary" id="infoClose">${T().close}</button>`;
+  $("infoBody").innerHTML = T().about + `<p class="legal-links">${legalLinks()}</p><button class="secondary" id="infoClose">${T().close}</button>`;
+  $("obLegal").innerHTML = T().obLegal(`<a href="terms.html" target="_blank" rel="noopener">${T().termsLinkWith}</a>`, `<a href="privacy.html" target="_blank" rel="noopener">${T().privacyLink}</a>`);
+  $("setLegal").innerHTML = legalLinks();
   $("infoClose").onclick = () => $("infoModal").hidden = true;
   setUpdated(); updateStats();
   if (L.length) { refreshMap(); if (selected != null) select(selected, false); if ($("results").innerHTML) rerun(); }
