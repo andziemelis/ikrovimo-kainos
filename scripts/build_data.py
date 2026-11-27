@@ -20,6 +20,15 @@ OP_NAMES = {"In Balance grid, UAB": "In Balance grid", "EV Infrastruktūra, UAB"
             "Elektrum Lietuva, UAB": "Elektrum", "Eleport, UAB": "Eleport", "Lidl Lietuva, UAB": "Lidl",
             "Neste Lietuva, UAB": "Neste", "IONITY GmbH": "IONITY", "VIRŠI Lietuva, UAB": "Virši"}
 PRICE = re.compile(r"([\d.]+) ?€/kWh")
+# The feed comes from outside, so every value is checked before it reaches the website.
+LT_BOX = (53.5, 57.0, 20.5, 27.2)          # lat min/max, lon min/max (Lithuania with a margin)
+MAX_PRICE = 5.0                             # €/kWh; anything higher is treated as a typo
+CTRL = re.compile(r"[\x00-\x1f\x7f<>]")
+
+
+def clean(s, limit):
+    """Plain, short text only: no control characters or angle brackets (they could become HTML)."""
+    return CTRL.sub("", s or "").strip()[:limit]
 
 
 def load_xml():
@@ -31,31 +40,51 @@ def load_xml():
 
 
 def min_price(texts):
-    nums = [float(m) for t in texts for m in PRICE.findall(t)]
+    nums = []
+    for t in texts:
+        for m in PRICE.findall(t):
+            try:
+                v = float(m)
+            except ValueError:
+                continue
+            if 0 < v <= MAX_PRICE:
+                nums.append(v)
     return min(nums) if nums else None
 
 
 def parse(root):
-    stations = []
+    stations, skipped = [], 0
     for st in root.iter("{%s}energyInfrastructureStation" % NS["egi"]):
-        op_raw = st.find("egi:energyProvider/fac:name/com:values/com:value", NS).text.strip()
-        conns = [(c.find("egi:connectorType", NS).text, float(c.find("egi:maxPowerAtSocket", NS).text or 0))
-                 for c in st.findall(".//egi:connector", NS)]
-        vals = [v.text.strip() for v in st.findall(".//egi:additionalInformation/com:values/com:value", NS) if v.text]
+        try:
+            la, lo = float(st.find(".//loc:latitude", NS).text), float(st.find(".//loc:longitude", NS).text)
+            op_raw = clean(st.find("egi:energyProvider/fac:name/com:values/com:value", NS).text, 80)
+        except (AttributeError, TypeError, ValueError):
+            skipped += 1; continue
+        if not (LT_BOX[0] <= la <= LT_BOX[1] and LT_BOX[2] <= lo <= LT_BOX[3]) or not op_raw:
+            skipped += 1; continue
+        conns = []
+        for c in st.findall(".//egi:connector", NS):
+            try:
+                kw = float(c.find("egi:maxPowerAtSocket", NS).text or 0)
+            except (AttributeError, TypeError, ValueError):
+                kw = 0
+            conns.append((clean(getattr(c.find("egi:connectorType", NS), "text", ""), 40), min(max(kw, 0), 1000)))
+        vals = [clean(v.text, 200) for v in st.findall(".//egi:additionalInformation/com:values/com:value", NS) if v.text and clean(v.text, 200)]
         ac = dc = None
         if vals and len(vals) == len(conns):  # prices are listed per connector, in order
             ac = min_price([v for v, (_, p) in zip(vals, conns) if p <= 22 and "Nemokam" not in v])
             dc = min_price([v for v, (_, p) in zip(vals, conns) if p > 22 and "Nemokam" not in v])
         all_free = bool(vals) and all("Nemokam" in v for v in vals)
         stations.append({
-            "la": round(float(st.find(".//loc:latitude", NS).text), 6),
-            "lo": round(float(st.find(".//loc:longitude", NS).text), 6),
+            "la": round(la, 6), "lo": round(lo, 6),
             "op": OP_NAMES.get(op_raw, op_raw), "kw": max([p for _, p in conns], default=0),
             "n": len(st.findall("egi:refillPoint", NS)), "ct": {t for t, _ in conns},
             "m": 0.0 if all_free else min_price(vals), "ac": ac, "dc": dc, "f": int(all_free),
             "fo": int(not all_free and any("Nemokam" in v for v in vals)),
             "pk": int(any("parkavimo" in v for v in vals)), "fx": int(any(re.search(r"\d €\s*\+", v) for v in vals)),
             "t": list(dict.fromkeys(vals))[:8]})
+    if skipped:
+        print(f"Skipped {skipped} stations with missing or impossible data")
     return stations
 
 
@@ -101,7 +130,7 @@ def build(stations, pub):
 
 def main():
     root = load_xml()
-    pub = root.find("com:publicationTime", NS).text
+    pub = clean(root.find("com:publicationTime", NS).text, 40)
     stations = parse(root)
     if len(stations) < 500:  # protect the live site from a broken or partial download
         sys.exit(f"Only {len(stations)} stations found, refusing to overwrite {OUT}")

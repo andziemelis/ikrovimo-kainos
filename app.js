@@ -1,7 +1,10 @@
 "use strict";
 // ---------- config ----------
 // Sign-in with Google / Apple. Paste the Firebase web config here to switch it on (see README).
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = null;   // when sign-in is switched on, also allow https://www.gstatic.com and Firebase hosts in the
+                                 // Content-Security-Policy in index.html, or the sign-in scripts will be blocked
+// Never let another site show this app inside a frame (stops "clickjacking" tricks).
+if (window.top !== window.self) { try { window.top.location = window.location.href; } catch { document.documentElement.innerHTML = ""; } }
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
 const DATA_URL = "data/lt.json";
 const SEARCH_KM = 25;          // look this far (straight line); the cost model decides what is worth it
@@ -237,9 +240,9 @@ function select(i, fly = true) {
   const offers = l.offers.map(x => {
     const sub = [x.ac != null && t.slowFrom(money(x.ac)), x.dc != null && t.fastFrom(money(x.dc))].filter(Boolean).join(" · ");
     const head = x.m == null ? t.noPrice : x.f ? t.free : `${t.from} ${kwhPrice(x.m)}`;
-    return `<div class="offer"><div class="h"><span>${x.op}</span><span style="color:${colourOf(x.f ? 0 : x.m)}">${head}</span></div>
+    return `<div class="offer"><div class="h"><span>${esc(x.op)}</span><span style="color:${colourOf(x.f ? 0 : x.m)}">${head}</span></div>
       ${sub ? `<div class="s">${sub}</div>` : ""}
-      ${x.t.length ? `<ul>${x.t.map(s => `<li>${translateTariff(s)}</li>`).join("")}</ul>` : ""}</div>`;
+      ${x.t.length ? `<ul>${x.t.map(s => `<li>${esc(translateTariff(s))}</li>`).join("")}</ul>` : ""}</div>`;
   }).join("");
   const app = store.get("navApp", null);
   $("detail").innerHTML = `
@@ -248,7 +251,7 @@ function select(i, fly = true) {
     <div class="amount" id="dAmt" aria-live="polite"></div>
     <div class="d-sub">${amount != null ? parts.join(" · ") : p === 0 ? t.freeToCharge : t.noPriceLong}
       <span class="tag" style="background:${colourOf(p)}">${levelOf(p)}</span></div>
-    <div class="d-sub">${timeLine}${o && l.offers.length > 1 && p != null ? " · " + t.cheapestVia(o.op) : ""}</div>
+    <div class="d-sub">${timeLine}${o && l.offers.length > 1 && p != null ? " · " + t.cheapestVia(esc(o.op)) : ""}</div>
     ${myCar && l.kw > 22 && !carFitsDC(l) ? `<div class="d-sub">${t.dcIncompatible}</div>` : ""}
     <div class="swipe" id="swipe">
       <span class="swipe-label"><span id="swipeTxt">${t.slideToNav}</span><span class="chev" aria-hidden="true">›››</span></span>
@@ -458,7 +461,7 @@ function wirePicks() {
 }
 const pickHTML = (x, n, metaLine) => `<div class="pick${n === 0 ? " first" : ""}" data-i="${x.l.i}" style="animation-delay:${n * 80}ms">
       <div class="amt" data-v="${x.c.total}">${money(x.c.total)}</div>
-      <div class="meta"><b>${x.o.op}</b><span>${metaLine}</span></div>
+      <div class="meta"><b>${esc(x.o.op)}</b><span>${metaLine}</span></div>
       <button class="nav-mini" data-nav="${x.l.i}" aria-label="${T().navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
     </div>`;
 const rerun = () => route ? routeBest() : bestCharge();
@@ -635,8 +638,12 @@ function setRouteTxt() {
 }
 const fmtKm = d => `${Math.round(d)} km`;
 const fmtDur = s => { const m = Math.round(s / 60), hh = Math.floor(m / 60); return hh ? `${hh} h ${m % 60} min` : `${m} min`; };
+let routeTimes = [];
 async function planRoute() {
   closeRouteForm();
+  const now = Date.now(); routeTimes = routeTimes.filter(t => now - t < 60000);
+  if (routeTimes.length >= 8) { toast(T().tooMany); return; }   // be fair to the free route server
+  routeTimes.push(now);
   const from = await resolvePlace(rFromSel), to = await resolvePlace(rToSel);
   if (!from) { toast(T().routeNoFrom); openRouteForm("from"); return; }
   if (!to) return;
@@ -977,7 +984,7 @@ async function renderCarList() {
   $("carList").innerHTML = hits.slice(0, 40).map(c => {
     const i = cars.indexOf(c);
     const specs = [c[4] && `${c[4]} kWh`, c[7] && `${t.fastUpTo} ${c[7]} kW`, (c[8] & 2) && !(c[8] & 1) ? "CHAdeMO" : ""].filter(Boolean).join(" · ");
-    return `<button class="caropt" role="listitem" data-car="${i}"><b>${carLabel(c)}</b><span>${specs}</span></button>`;
+    return `<button class="caropt" role="listitem" data-car="${i}"><b>${esc(carLabel(c))}</b><span>${esc(specs)}</span></button>`;
   }).join("") || (terms.length ? `<div class="note">${t.carNotFound}</div>` : "");
 }
 function openOnboard(changing = false) {

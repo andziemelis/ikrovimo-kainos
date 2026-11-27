@@ -2,6 +2,8 @@
 <html lang="lt">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.openfreemap.org; font-src 'self'; connect-src 'self' https://*.openfreemap.org https://photon.komoot.io https://router.project-osrm.org; worker-src 'self' blob:; child-src blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,7 +18,7 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
-<link rel="stylesheet" href="style.css?v=202611270811">
+<link rel="stylesheet" href="style.css?v=202611270825">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
@@ -30,8 +32,8 @@
     <button class="route-x" id="routeClear" type="button" aria-label="Clear route" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div class="route-form" id="routeForm" hidden>
       <div class="rf-fields">
-        <label class="rf-row"><span class="rf-dot from" aria-hidden="true"></span><input id="rFrom" type="text" autocomplete="off" enterkeyhint="next"></label>
-        <label class="rf-row"><span class="rf-dot to" aria-hidden="true"></span><input id="rTo" type="text" autocomplete="off" enterkeyhint="search"></label>
+        <label class="rf-row"><span class="rf-dot from" aria-hidden="true"></span><input id="rFrom" type="text" maxlength="120" autocomplete="off" enterkeyhint="next"></label>
+        <label class="rf-row"><span class="rf-dot to" aria-hidden="true"></span><input id="rTo" type="text" maxlength="120" autocomplete="off" enterkeyhint="search"></label>
         <span class="rf-line" aria-hidden="true"></span>
       </div>
       <button class="route-x inside" id="routeClose" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -171,7 +173,7 @@
     </div>
     <h3 data-t="carQ"></h3>
     <p class="note" data-t="carWhy"></p>
-    <input id="carSearch" type="search" autocomplete="off" aria-label="Car">
+    <input id="carSearch" type="search" maxlength="60" autocomplete="off" aria-label="Car">
     <div id="carList" class="carlist" role="list"></div>
     <button class="secondary" id="carSkip" data-t="skip"></button>
     <p class="ob-legal" id="obLegal"></p>
@@ -188,7 +190,7 @@
 </div>
 
 <script src="vendor/maplibre-gl.js"></script>
-<script src="i18n.js?v=202611270811"></script>
-<script src="app.js?v=202611270811"></script>
+<script src="i18n.js?v=202611270825"></script>
+<script src="app.js?v=202611270825"></script>
 </body>
 </html>
