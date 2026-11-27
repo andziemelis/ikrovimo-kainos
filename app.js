@@ -93,7 +93,7 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "bottom-right");
 map.on("style.load", () => {
-  try { map.setProjection({ type: "globe" }); } catch (e) { console.warn("Globe view not supported", e); }
+  try { map.setProjection({ type: "globe" }); } catch { /* older browsers: flat map */ }
   try { map.setSky({ "sky-color": "#0b1530", "horizon-color": "#1e3a5f", "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 8, 0] }); } catch {}
 });
 
@@ -304,8 +304,12 @@ let OPS = [];
 fetch("data/operators.json", { cache: "no-cache" }).then(r => r.json()).then(j => { OPS = j.operators || []; if (selected != null) select(selected, false); }).catch(() => {});
 const PLATFORM = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(navigator.userAgent) ? "android" : "desktop";
 const opInfo = name => { const n = String(name).toLowerCase(); return OPS.find(o => o.match.some(m => n.includes(m))); };
+const httpsOnly = u => typeof u === "string" && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : null;
 function appLink(o) {
-  const ios = o.ios && `https://apps.apple.com/lt/app/id${o.ios}`, play = o.play && `https://play.google.com/store/search?q=${encodeURIComponent(o.play)}&c=apps`;
+  return httpsOnly(appLinkRaw(o));
+}
+function appLinkRaw(o) {
+  const ios = /^\d+$/.test(o.ios || "") && `https://apps.apple.com/lt/app/id${o.ios}`, play = o.play && `https://play.google.com/store/search?q=${encodeURIComponent(o.play)}&c=apps`;
   return PLATFORM === "ios" ? ios || o.web : PLATFORM === "android" ? play || o.web : o.web || ios || play;
 }
 function payHTML(l) {
@@ -1026,7 +1030,7 @@ async function initAuth() {
     await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js");
     firebase.initializeApp(FIREBASE_CONFIG);
     firebase.auth().onAuthStateChanged(u => { authUser = u; if (u && !$("onboard").hidden) $("obAuth").hidden = true; });
-  } catch (e) { console.warn("Sign-in unavailable", e); }
+  } catch { /* sign-in unavailable: the app keeps working without it */ }
 }
 async function signIn(provider) {
   try { const r = await firebase.auth().signInWithPopup(provider); authUser = r.user; $("obAuth").hidden = true; toast(T().signedInAs(authUser.displayName || authUser.email || "")); }

@@ -5,7 +5,7 @@ Usage:
   python scripts/build_data.py path/to/file.xml  # use a local file
 Data licence: CC BY 4.0, AB Via Lietuva (https://ev.vialietuva.lt/en/data-provision)
 """
-import collections, json, re, sys, urllib.request
+import collections, json, re, sys, urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -22,6 +22,7 @@ OP_NAMES = {"In Balance grid, UAB": "In Balance grid", "EV Infrastruktūra, UAB"
 PRICE = re.compile(r"([\d.]+) ?€/kWh")
 # The feed comes from outside, so every value is checked before it reaches the website.
 LT_BOX = (53.5, 57.0, 20.5, 27.2)          # lat min/max, lon min/max (Lithuania with a margin)
+MAX_BYTES = 60 * 1024 * 1024               # the real file is a few MB
 MAX_PRICE = 5.0                             # €/kWh; anything higher is treated as a typo
 CTRL = re.compile(r"[\x00-\x1f\x7f<>]")
 
@@ -34,9 +35,16 @@ def clean(s, limit):
 def load_xml():
     if len(sys.argv) > 1:
         return ET.parse(sys.argv[1]).getroot()
+    # Only ever download Via Lietuva's file: https, same host even after redirects, and a size cap.
     req = urllib.request.Request(SOURCE, headers={"User-Agent": "ev-price-map/0.1"})
     with urllib.request.urlopen(req, timeout=120) as r:
-        return ET.fromstring(r.read())
+        final = urllib.parse.urlparse(r.geturl())
+        if final.scheme != "https" or final.hostname != urllib.parse.urlparse(SOURCE).hostname:
+            sys.exit(f"Refusing data from unexpected address {r.geturl()}")
+        body = r.read(MAX_BYTES + 1)
+    if len(body) > MAX_BYTES:
+        sys.exit("Download is larger than expected, refusing it")
+    return ET.fromstring(body)
 
 
 def min_price(texts):

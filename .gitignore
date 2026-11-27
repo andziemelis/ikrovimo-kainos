@@ -1,0 +1,15 @@
+# Never commit secrets: keys, passwords and environment files stay on your computer
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+service-account*.json
+firebase-adminsdk*.json
+secrets/
+# local junk
+.DS_Store
+node_modules/
+__pycache__/
+*.map
