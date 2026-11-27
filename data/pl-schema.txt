@@ -1,0 +1,137 @@
+===== EIPA_DICTIONARIES =====
+content-type: application/json · bytes: 5998
+top level: dict with keys ['charging_mode', 'connector_interface', 'fuel_type', 'gas_connector_interface', 'hydrogen_refill_solution', 'station_authentication_method', 'station_payment_method', 'weekday', 'company_type', 'country']
+charging_mode: list [7]
+  charging_mode[].id: int = 1
+  charging_mode[].name: str = "Mode1-AC-1p"
+connector_interface: list [34]
+  connector_interface[].id: int = 1
+  connector_interface[].name: str = "DOMESTIC-A"
+  connector_interface[].description: str = "Standard/domowy, typ A"
+fuel_type: list [2]
+  fuel_type[].id: int = 1
+  fuel_type[].name: str = "zimne"
+  fuel_type[].description: str = "-"
+gas_connector_interface: list [2]
+  gas_connector_interface[].id: int = 1
+  gas_connector_interface[].name: str = "NGV1"
+  gas_connector_interface[].description: str = "ISO 14469-1"
+hydrogen_refill_solution: list [4]
+  hydrogen_refill_solution[].id: int = 1
+  hydrogen_refill_solution[].name: str = "350 bar - osobowe"
+  hydrogen_refill_solution[].description: str = "Tankowanie ciśnieniem 350 bar - samochody osobowe"
+station_authentication_method: list [13]
+  station_authentication_method[].id: int = 0
+  station_authentication_method[].description: str = "Nieograniczony dostęp (brak autentykacji / identyfikacji użytkownika)…
+station_payment_method: list [9]
+  station_payment_method[].id: int = 0
+  station_payment_method[].description: str = "Nieokreślone"
+weekday: list [7]
+  weekday[].id: int = 1
+  weekday[].name: str = "poniedziałek"
+company_type: list [3]
+  company_type[].id: int = 1
+  company_type[].name: str = "operator stacji"
+country: list [27]
+  country[].id: str = "pl"
+  country[].name: str = "Polska"
+===== EIPA_POOLS =====
+content-type: application/json · bytes: 6753494
+top level: dict with keys ['data', 'generated']
+data: list [6320]
+  data[].operator_id: int = 4
+  data[].charging: bool = true
+  data[].refilling: bool = false
+  data[].h2refilling: bool = false
+  data[].features: list [1]
+  data[].legalized: bool = true
+  data[].filling: bool = false
+  data[].code: str = "PL-GJC-PEVP01001"
+  data[].id: int = 240
+  data[].name: str = "Business Garden Wrocław EV+"
+  data[].latitude: float = 51.116886
+  data[].longitude: float = 16.99725
+  data[].elevation: int = 997
+  data[].street: str = "ul. Legnicka"
+  data[].house_number: str = "48G-H"
+  data[].postal_code: str = "54-202"
+  data[].city: str = "Wrocław"
+  data[].operating_hours: list [7]
+    data[].operating_hours[].weekday: int = 1
+    data[].operating_hours[].from_time: str = "00:00"
+    data[].operating_hours[].to_time: str = "23:59"
+  data[].closing_hours: list [0]
+  data[].images: list [0]
+  data[].ts: str = "2019-04-25T11:46:25+02:00"
+  data[].accessibility: str = "Dostępne w okolicy: restauracja w hotelu HP Park Poznań, ścieżki pies…
+generated: str = "2026-11-27T10:25:06+01:00"
+===== EIPA_STATIONS =====
+content-type: application/json · bytes: 2509229
+top level: dict with keys ['data', 'generated']
+data: list [7712]
+  data[].authentication_methods: list [2]
+  data[].pool_id: int = 240
+  data[].payment_methods: list [2]
+  data[].longitude: float = 16.99725
+  data[].latitude: float = 51.116886
+  data[].suspended: bool = false
+  data[].id: int = 1153
+  data[].type: str = "E"
+  data[].images: list [0]
+  data[].ts: str = "2026-04-08T10:25:47+02:00"
+  data[].location: dict
+    data[].location.province: str = "dolnośląskie"
+    data[].location.district: str = "Wrocław"
+    data[].location.community: str = "Wrocław"
+    data[].location.city: str = "Wrocław"
+generated: str = "2026-11-27T10:25:07+01:00"
+===== EIPA_POINTS =====
+content-type: application/json · bytes: 4999501
+top level: dict with keys ['data', 'generated']
+data: list [15625]
+  data[].gas_connector_interfaces: list [0]
+  data[].hydrogen_refill_solutions: list [0]
+  data[].fuel_types: list [0]
+  data[].station_id: int = 1153
+  data[].code: str = "PL-GJC-EEVP01001"
+  data[].id: int = 13477
+  data[].charging_solutions: list [1]
+    data[].charging_solutions[].mode: int = 6
+    data[].charging_solutions[].power: int = 22
+  data[].ts: str = "2019-04-25T11:48:42+02:00"
+  data[].connectors: list [1]
+    data[].connectors[].interfaces: list [1]
+    data[].connectors[].power: int = 22
+    data[].connectors[].cable_attached: bool = false
+    data[].connectors[].ts: str = "2019-04-25T11:48:42+02:00"
+generated: str = "2026-11-27T10:25:12+01:00"
+===== EIPA_DYNAMIC =====
+content-type: application/json · bytes: 9121333
+top level: dict with keys ['data', 'generated']
+data: list [15625]
+  data[].point_id: int = 13477
+  data[].code: str = "PL-GJC-EEVP01001"
+  data[].status: dict
+    data[].status.availability: int = 1
+    data[].status.status: int = 1
+    data[].status.ts: str = "2021-01-02T00:47:27+01:00"
+  data[].prices: list [1]
+    data[].prices[].literal: str = "PL*EVP*EPL105*105A"
+    data[].prices[].price: str = "1.00"
+    data[].prices[].unit: str = "kWh"
+    data[].prices[].ts: str = "2025-09-01T18:15:02+02:00"
+generated: str = "2026-11-27T10:25:07+01:00"
+===== EIPA_OPERATORS =====
+content-type: application/json · bytes: 104965
+top level: dict with keys ['data', 'generated']
+data: list [513]
+  data[].id: int
+  data[].name: str
+  data[].code: str
+  data[].phone: str
+  data[].email: str
+  data[].website: str
+  data[].short_name: str
+  data[].type: int
+  data[].country: str
+generated: str
