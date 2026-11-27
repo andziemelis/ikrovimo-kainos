@@ -18,7 +18,7 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css?lib=5.24.1">
-<link rel="stylesheet" href="style.css?v=202611270831">
+<link rel="stylesheet" href="style.css?v=202611270850">
 </head>
 <body>
 <div id="map" aria-label="Map"></div>
@@ -54,7 +54,11 @@
       <div class="seg" id="fastSeg" role="radiogroup" aria-label="Chargers"></div>
       <button class="chip" id="unkChip" data-t="hideUnknown"></button>
     </div>
-    <div class="row">
+    <div class="trip-opts" id="tripOpts">
+      <div class="row"><label class="lbl" data-t="battNow"></label><div class="seg grow" id="socSeg" role="radiogroup" aria-label="Battery"></div></div>
+      <div class="row"><div class="seg" id="modeSeg" role="radiogroup" aria-label="Plan"></div><button class="chip" id="rtChip" data-t="roundTrip"></button></div>
+    </div>
+    <div class="row" id="kwhRow">
       <label class="lbl" data-t="howMuch"></label>
       <div class="seg grow" id="kwhSeg" role="radiogroup" aria-label="kWh"></div>
       <select id="kwh" class="sr-only" tabindex="-1" aria-hidden="true">
@@ -190,7 +194,7 @@
 </div>
 
 <script src="vendor/maplibre-gl.js?lib=5.24.1"></script>
-<script src="i18n.js?v=202611270831"></script>
-<script src="app.js?v=202611270831"></script>
+<script src="i18n.js?v=202611270850"></script>
+<script src="app.js?v=202611270850"></script>
 </body>
 </html>

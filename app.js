@@ -208,6 +208,13 @@ async function addLayers() {
     paint: { "line-color": "#9db8ff", "line-width": ["interpolate", ["linear"], ["zoom"], 6, 3, 12, 6], "line-opacity": 0.95 } }, "links-glow");
   map.addLayer({ id: "selected", type: "symbol", source: "chargers", filter: ["==", ["get", "i"], -1],
     layout: { "icon-image": ["concat", ["get", "icon"], "-sel"], "icon-size": 1.25, "icon-allow-overlap": true, "icon-ignore-placement": true } });
+  // numbered charging stops of a planned trip
+  map.addSource("stops", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "stops-c", type: "circle", source: "stops",
+    paint: { "circle-color": "#3d6bff", "circle-radius": 12, "circle-stroke-color": "#ffffff", "circle-stroke-width": 2.5, "circle-translate": [0, -26] } });
+  map.addLayer({ id: "stops-t", type: "symbol", source: "stops",
+    layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-allow-overlap": true, "text-ignore-placement": true, "text-offset": [0, -2] },
+    paint: { "text-color": "#ffffff" } });
   map.addLayer({ id: "me", type: "circle", source: "me",
     paint: { "circle-color": ["match", ["get", "kind"], "home", "#9db8ff", "dest", "#f8fafc", "#60a5fa"], "circle-radius": 9, "circle-stroke-color": "#0b1220", "circle-stroke-width": 3 } });
   for (const layer of ["badges", "selected"]) {
@@ -636,6 +643,7 @@ async function resolvePlace(s) {
   if (s.kind === "home") return homeLoc && { pos: homeLoc, label: T().homeLbl, kind: "home" };
   return { pos: s.pos, label: s.label, kind: "place" };
 }
+const setBestLabel = () => { $("bestBtn").textContent = route ? T().replan : T().bestCharge; };
 function setRouteTxt() {
   $("routeTxt").innerHTML = route ? `<b>${esc(route.from.kind === "me" ? T().myLocation : route.from.kind === "home" ? T().homeLbl : route.from.label)}</b><i>→</i><b>${esc(route.to.label)}</b>`
     : `<span class="ph">${T().whereTo}</span>`;
@@ -667,7 +675,7 @@ async function planRoute() {
     toast(T().routeFail);
   }
   route = { from, to, coords, dist, dur, approx };
-  document.documentElement.classList.add("route-on");
+  document.documentElement.classList.add("route-on"); setBestLabel();
   setRouteTxt();
   $("routeClear").hidden = false;
   if (closeDetail && selected != null) closeDetail();
@@ -680,50 +688,199 @@ async function planRoute() {
   const b = new maplibregl.LngLatBounds(coords[0], coords[0]); coords.forEach(c => b.extend(c));
   map.fitBounds(b, { padding: { top: 110, bottom: isPhone() ? window.innerHeight * 0.55 : 60, left: isPhone() ? 40 : 440, right: 40 }, maxZoom: 13, pitch: 0, bearing: 0 });
 }
+// ---------- trip planner: where to charge on the way ----------
+// The formulas, in plain words:
+//  1. Energy for a stretch of road = km × consumption. Consumption = your car's figure × a speed factor
+//     (motorways use more) × a winter factor (Nov–Mar). The speed comes from the route's own time and distance.
+//  2. If the battery covers the whole trip and still leaves the reserve, no stop is needed.
+//  3. Otherwise every combination of fast chargers along the road is weighed (dynamic programming):
+//     cost of a stop = price × kWh charged + (charging time + detour + getting on/off the road) × value of your time.
+//     At each stop you charge only what the next stretch needs. Above 80 % charging runs at about a third of the speed,
+//     so the plan only goes past 80 % when that beats another stop. You never plan to arrive anywhere below 10 %.
+//     The plan with the lowest total wins.
+//  4. "Fastest" is the same formula with time weighted very heavily.
+//  5. "Round trip" plans the way there and back as one journey.
+//  6. If the road leaves the area we have stations for, it plans up to the last station and warns you.
+const RESERVE = 0.10, DC_TARGET = 0.80, SLOW_ABOVE = 0.35, STOP_MIN = 10, DETOUR_KMH = 45, FASTEST_EUR_H = 300;
+let tripSoc = store.get("tripSoc", 80), tripMode = store.get("tripMode", "cheap"), roundTrip = store.get("roundTrip", false);
+let tripPlan = null;
+function tripCar() {
+  const known = !!(myCar && myCar[4]);
+  return { batt: known ? myCar[4] : 60, dcKw: myCar && myCar[7] ? myCar[7] : 100, known };
+}
+function tripConsumption(distKm, durS) {
+  const v = distKm / Math.max(durS / 3600, 0.05);
+  const speedF = v > 95 ? 1.22 : v > 80 ? 1.15 : v > 60 ? 1.05 : 0.95;
+  const mo = new Date().getMonth(), winter = mo >= 10 || mo <= 2;
+  return { per100: car.cons * speedF * (winter ? 1.15 : 1), motorway: v > 80, winter };
+}
+// average charging power from ~10 % to 80 % at this station for this car
+const stopKw = l => Math.max(5, Math.min(l.kw, tripCar().dcKw) * 0.75);
+function chargeMin(rate, arriveKwh, q, B) {
+  const fastPart = Math.min(q, Math.max(0, DC_TARGET * B - arriveKwh));
+  return fastPart / rate * 60 + (q - fastPart) / (rate * SLOW_ABOVE) * 60;
+}
+// stations near the road, with where along the trip they are (km) and how far off the road
+function stationsAlong(legs) {
+  const out = [];
+  let offset = 0;
+  for (const pts of legs) {
+    const samp = [[pts[0][0], pts[0][1], 0]]; let run = 0;
+    for (let k = 1; k < pts.length; k++) {
+      run += km(pts[k - 1][1], pts[k - 1][0], pts[k][1], pts[k][0]);
+      if (run - samp[samp.length - 1][2] >= 0.3 || k === pts.length - 1) samp.push([pts[k][0], pts[k][1], run]);
+    }
+    const scale = route.dist / Math.max(run, 0.1);
+    let minLo = 180, maxLo = -180, minLa = 90, maxLa = -90;
+    for (const [lo, la] of samp) { minLo = Math.min(minLo, lo); maxLo = Math.max(maxLo, lo); minLa = Math.min(minLa, la); maxLa = Math.max(maxLa, la); }
+    for (const l of L) {
+      if (l.la < minLa - 0.05 || l.la > maxLa + 0.05 || l.lo < minLo - 0.09 || l.lo > maxLo + 0.09) continue;
+      const cosLa = Math.cos(l.la * Math.PI / 180); let best = Infinity, at = 0;
+      for (const [lo, la, d] of samp) { const dx = (lo - l.lo) * cosLa, dy = la - l.la, dd = dx * dx + dy * dy; if (dd < best) { best = dd; at = d; } }
+      const off = Math.sqrt(best) * 111.2;
+      if (off <= CORRIDOR_KM) out.push({ l, off, at: offset + at * scale });
+    }
+    offset += route.dist;
+  }
+  return out;
+}
+function planTrip() {
+  const tc = tripCar(), B = tc.batt, legs = roundTrip ? [route.coords, route.coords.slice().reverse()] : [route.coords];
+  const total = route.dist * legs.length, dur = route.dur * legs.length;
+  const cons = tripConsumption(route.dist, route.dur), kwhPerKm = cons.per100 / 100;
+  const s0 = tripSoc / 100, val = tripMode === "fast" ? FASTEST_EUR_H : car.timeVal;
+  const near = stationsAlong(legs);
+  // stops: fast chargers this car can use, with a known price
+  let stops = near.map(x => ({ ...x, ...priceOf(x.l, true) })).filter(x => x.p != null && x.p > 0);
+  stops.sort((a, b) => a.at - b.at);
+  const nodes = [{ at: 0, d: 0, start: 1 }, ...stops.map(x => ({ ...x, d: x.off * ROAD_FACTOR, rate: stopKw(x.l) })), { at: total, d: 0, dest: 1 }];
+  const N = nodes.length, END = N - 1;
+  const E = (i, j) => (nodes[j].at - nodes[i].at + nodes[i].d + nodes[j].d) * kwhPerKm;   // energy from i to j incl. detours
+  const firstBudget = (s0 - RESERVE) * B;
+  // direct: no stop needed
+  if (E(0, END) <= firstBudget) return { kind: "none", total, dur, cons, tc, arrive: (s0 * B - E(0, END)) / B, near };
+  // state k: 0 = reached straight from the start (arrives with what is left of the start charge), 1 = from a stop (arrives at the reserve)
+  const best = [new Array(N).fill(null), new Array(N).fill(null)];
+  for (let j = 1; j < END; j++) if (E(0, j) <= firstBudget) best[0][j] = { obj: 0, money: 0, min: 0, prev: null };
+  const cap = B, maxLeg = (cap - RESERVE * B) / kwhPerKm + 10;
+  let bestEnd = null;
+  for (let i = 1; i < END; i++) for (let k = 0; k < 2; k++) {
+    const s = best[k][i]; if (!s) continue;
+    const n = nodes[i], arrive = k === 0 ? s0 * B - E(0, i) : RESERVE * B;
+    for (let j = i + 1; j < N; j++) {
+      if (nodes[j].at - n.at > maxLeg) break;
+      const need = E(i, j) + RESERVE * B - arrive;
+      if (need < 1 || arrive + need > cap + 0.01) continue;
+      const min = chargeMin(n.rate, arrive, need, B) + STOP_MIN + 2 * n.d / DETOUR_KMH * 60;
+      const money = n.p * need, obj = s.obj + money + min / 60 * val;
+      const cand = { obj, money: s.money + money, min: s.min + min, prev: [i, k], q: need, arrive };
+      if (j === END) { if (!bestEnd || obj < bestEnd.obj) bestEnd = cand; }
+      else if (!best[1][j] || obj < best[1][j].obj) best[1][j] = cand;
+    }
+  }
+  const walk = endState => {
+    const list = []; let cur = endState;
+    while (cur && cur.prev) { const [i, k] = cur.prev; const n = nodes[i];
+      list.unshift({ ...n, q: cur.q, socIn: cur.arrive / B, socOut: (cur.arrive + cur.q) / B, min: chargeMin(n.rate, cur.arrive, cur.q, B) + STOP_MIN + 2 * n.d / DETOUR_KMH * 60 });
+      cur = best[k][i]; }
+    return list;
+  };
+  const avgP = stops.length ? stops.reduce((a, x) => a + x.p, 0) / stops.length : 0;
+  if (bestEnd) {
+    const plan = walk(bestEnd);
+    return { kind: "stops", total, dur, cons, tc, stops: plan, money: bestEnd.money, min: bestEnd.min, arrive: RESERVE, avgP, near };
+  }
+  // no full plan: the road runs past the stations we know (e.g. abroad) or the battery is too low to reach the first one
+  let far = null;
+  for (let j = 1; j < END; j++) for (let k = 0; k < 2; k++) { const s = best[k][j]; if (s && (!far || nodes[j].at > nodes[far[0]].at)) far = [j, k]; }
+  if (!far) return { kind: "unreachable", total, dur, cons, tc, near };
+  const [fj, fk] = far, fn = nodes[fj], arriveF = fk === 0 ? s0 * B - E(0, fj) : RESERVE * B, qF = Math.max(0, DC_TARGET * B - arriveF);
+  const plan = walk(best[fk][fj]);
+  plan.push({ ...fn, q: qF, socIn: arriveF / B, socOut: DC_TARGET, min: chargeMin(fn.rate, arriveF, qF, B) + STOP_MIN, last: true });
+  const money = best[fk][fj].money + fn.p * qF, leftKm = total - fn.at, rangeKm = (DC_TARGET - RESERVE) * B / kwhPerKm;
+  return { kind: "partial", total, dur, cons, tc, stops: plan, money, min: best[fk][fj].min + plan[plan.length - 1].min, leftKm, rangeKm, avgP, near };
+}
+// battery level along the trip, as a small chart
+function socChart(plan) {
+  const W = 320, H = 64, B = plan.tc.batt, kpk = plan.cons.per100 / 100, X = km => 6 + km / plan.total * (W - 12), Y = s => 6 + (1 - Math.max(0, Math.min(1, s))) * (H - 12);
+  const pts = [[0, tripSoc / 100]];
+  for (const s of plan.stops || []) { pts.push([s.at, s.socIn], [s.at, s.socOut]); }
+  const lastAt = pts[pts.length - 1][0], lastSoc = pts[pts.length - 1][1];
+  pts.push([plan.total, plan.kind === "partial" ? Math.max(0, lastSoc - (plan.total - lastAt) * kpk / B) : plan.arrive]);
+  const line = pts.map(([k, s]) => `${X(k).toFixed(1)},${Y(s).toFixed(1)}`).join(" ");
+  const dots = (plan.stops || []).map((s, n) => `<circle cx="${X(s.at).toFixed(1)}" cy="${Y(s.socOut).toFixed(1)}" r="4.5"/><text x="${X(s.at).toFixed(1)}" y="${(Y(s.socOut) - 9).toFixed(1)}">${Math.round(s.socOut * 100)}%</text>`).join("");
+  return `<svg class="soc" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+    <defs><linearGradient id="socG" x1="0" x2="1"><stop offset="0" stop-color="#b9ccff"/><stop offset="1" stop-color="#3d6bff"/></linearGradient></defs>
+    <line class="res" x1="6" x2="${W - 6}" y1="${Y(RESERVE).toFixed(1)}" y2="${Y(RESERVE).toFixed(1)}"/>
+    <polyline points="${line}"/>${dots}
+    <text class="end" x="${W - 6}" y="${H - 2}">${Math.round(Math.max(0, pts[pts.length - 1][1]) * 100)}%</text>
+    <text class="beg" x="6" y="${H - 2}">${tripSoc}%</text></svg>`;
+}
+function tripNavUrl(stops) {
+  const wp = stops.map(s => `${s.l.la},${s.l.lo}`).join("|");
+  const dest = roundTrip ? route.from.pos : route.to.pos;
+  return `https://www.google.com/maps/dir/?api=1${route.from.kind === "me" ? "" : `&origin=${route.from.pos.join(",")}`}&destination=${dest.join(",")}${wp ? `&waypoints=${encodeURIComponent(wp)}` : ""}&travelmode=driving`;
+}
+function setStopsOnMap(stops) {
+  map.getSource("stops")?.setData({ type: "FeatureCollection", features: (stops || []).map((s, n) => ({ type: "Feature", geometry: { type: "Point", coordinates: [s.l.lo, s.l.la] }, properties: { n: String(n + 1) } })) });
+}
+function buildTripControls() {
+  liquidSeg($("socSeg"), [20, 40, 60, 80, 100].map(v => ({ value: String(v), label: `${v}%` })), String(tripSoc), v => {
+    tripSoc = +v; store.set("tripSoc", tripSoc); if (route) routeBest(); });
+  liquidSeg($("modeSeg"), [{ value: "cheap", label: T().modeCheap }, { value: "fast", label: T().modeFast }], tripMode, v => {
+    tripMode = v; store.set("tripMode", v); if (route) routeBest(); });
+  $("rtChip").classList.toggle("on", roundTrip);
+}
+$("rtChip").onclick = () => { roundTrip = !roundTrip; store.set("roundTrip", roundTrip); $("rtChip").classList.toggle("on", roundTrip); if (route) routeBest(); };
 function routeBest() {
   if (!route) return;
   if (isPhone() && sheetState === "peek") snapSheet("half");
-  const t = T(), kwh = +$("kwh").value, pts = route.coords;
-  // points along the road roughly every 300 m, with the distance driven so far
-  const samp = [[pts[0][0], pts[0][1], 0]]; let run = 0;
-  for (let k = 1; k < pts.length; k++) {
-    run += km(pts[k - 1][1], pts[k - 1][0], pts[k][1], pts[k][0]);
-    if (run - samp[samp.length - 1][2] >= 0.3 || k === pts.length - 1) samp.push([pts[k][0], pts[k][1], run]);
+  const t = T(), plan = tripPlan = planTrip();
+  const head = `<div class="res-head">${t.tripHead(fmtKm(plan.total), fmtDur(plan.dur))}${roundTrip ? " · " + t.roundTrip.toLowerCase() : ""}</div>`;
+  const consLine = `<div class="trip-note">${t.consNote(plan.cons.per100.toFixed(1).replace(".", lang === "lt" ? "," : "."), plan.cons.motorway, plan.cons.winter)}${plan.tc.known ? "" : " · " + t.noCarBatt}</div>`;
+  let html = head;
+  if (plan.kind === "none") {
+    // formula 2: no stop needed – show where it is cheapest to top up once you arrive
+    html += `<div class="trip-sum ok"><div class="ts-top"><b>${t.noStop}</b><span>${t.arriveWith(Math.round(plan.arrive * 100))}</span></div>${socChart(plan)}</div>${consLine}`;
+    const dest = roundTrip ? route.from.pos : route.to.pos, refill = Math.max(5, (DC_TARGET - plan.arrive) * plan.tc.batt);
+    const atDest = L.map(l => ({ l, d: km(dest[0], dest[1], l.la, l.lo), ...priceOf(l, false) })).filter(x => x.d <= 5 && x.p > 0)
+      .map(x => ({ ...x, c: { total: x.p * refill } })).sort((a, b) => a.c.total - b.c.total);
+    const top = []; for (const x of atDest) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.3)) top.push(x); if (top.length === 3) break; }
+    if (top.length) html += `<div class="res-head">${t.nearDestHead(Math.round(refill))}</div>` + top.map((x, n) => pickHTML(x, n, t.destMeta(x.d.toFixed(1).replace(".", lang === "lt" ? "," : "."), kwhPrice(x.p)))).join("");
+    pinned = new Set(top.map(x => x.l.i)); lastPicks = new Map(top.map(x => [x.l.i, { op: x.o.op, total: x.c.total, save: 0 }]));
+    setStopsOnMap([]);
+  } else if (plan.kind === "unreachable") {
+    html += `<div class="trip-sum warn"><b>${t.cantReach(tripSoc)}</b></div>${consLine}`;
+    pinned = new Set(); lastPicks = new Map(); setStopsOnMap([]);
+  } else {
+    const n = plan.stops.length, saved = plan.stops.reduce((a, s) => a + Math.max(0, (plan.avgP - s.p) * s.q), 0);
+    html += `<div class="trip-sum${plan.kind === "partial" ? " warn" : ""}">
+      <div class="ts-top"><span class="amt" data-v="${plan.money}">${money(plan.money)}</span>
+        <span>${t.stopsCount(n)} · +${Math.round(plan.min)} min</span></div>
+      ${socChart(plan)}
+      ${saved > 0.5 ? `<div class="ts-save">${t.cheaperAvg(money(saved))}</div>` : ""}
+      ${plan.kind === "partial" ? `<div class="ts-warn">${t.outOfData(Math.round(plan.rangeKm), Math.round(plan.leftKm))}</div>` : ""}
+    </div>${consLine}`;
+    html += plan.stops.map((s, k) => `<div class="pick stop${k === 0 ? " first" : ""}" data-i="${s.l.i}" style="animation-delay:${k * 80}ms">
+      <div class="stop-n">${k + 1}</div>
+      <div class="meta"><b>${esc(s.o.op)} · ${money(s.p * s.q)}</b><span>${t.stopMeta(Math.round(s.at), Math.round(s.q), Math.round(s.socIn * 100), Math.round(s.socOut * 100), Math.round(s.min))}</span></div>
+      <button class="nav-mini" data-nav="${s.l.i}" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21 3 3 10.5l7.2 2.3L12.5 20z"/></svg></button>
+    </div>`).join("");
+    html += `<a class="go trip-go" id="tripGo" href="${tripNavUrl(plan.stops)}" target="_blank" rel="noopener">${t.startTrip}</a><div class="trip-note">${t.startTripNote}</div>`;
+    pinned = new Set(plan.stops.map(s => s.l.i));
+    lastPicks = new Map(plan.stops.map(s => [s.l.i, { op: s.o.op, total: s.p * s.q, save: Math.max(0, (plan.avgP - s.p) * s.q) }]));
+    setStopsOnMap(plan.stops);
   }
-  const scale = route.approx ? route.dist / Math.max(run, 0.1) : 1;
-  let minLo = 180, maxLo = -180, minLa = 90, maxLa = -90;
-  for (const [lo, la] of samp) { minLo = Math.min(minLo, lo); maxLo = Math.max(maxLo, lo); minLa = Math.min(minLa, la); maxLa = Math.max(maxLa, la); }
-  const pad = 0.05;
-  const cand = [];
-  for (const l of L) {
-    if (l.la < minLa - pad || l.la > maxLa + pad || l.lo < minLo - pad * 1.8 || l.lo > maxLo + pad * 1.8) continue;
-    if (fastOnly && !isFast(l)) continue;
-    const pr = priceOf(l); if (pr.p == null || pr.p <= 0) continue;
-    const cosLa = Math.cos(l.la * Math.PI / 180); let best = Infinity, at = 0;
-    for (const [lo, la, d] of samp) { const dx = (lo - l.lo) * cosLa, dy = la - l.la, dd = dx * dx + dy * dy; if (dd < best) { best = dd; at = d; } }
-    const off = Math.sqrt(best) * 111.2;
-    if (off <= CORRIDOR_KM) cand.push({ l, off, at: at * scale, ...pr, c: tripCost(off, pr.p, kwh) });
-  }
-  const head = `<div class="res-head">${t.alongHead(fmtKm(route.dist), fmtDur(route.dur))}</div>`;
-  if (!cand.length) { $("results").innerHTML = head + `<div class="note">${t.noneAlong}</div>`; pinned = new Set(); refreshMap(false); return; }
-  // what most drivers would do: stop at the first charger right by the road
-  const byRoad = cand.filter(x => x.off <= 1); const first = (byRoad.length ? byRoad : cand).reduce((a, b) => b.at < a.at ? b : a);
-  cand.sort((a, b) => a.c.total - b.c.total);
-  const top = [];
-  for (const x of cand) { if (top.every(y => km(y.l.la, y.l.lo, x.l.la, x.l.lo) > 0.5)) top.push(x); if (top.length === 3) break; }
-  pinned = new Set(top.map(x => x.l.i)); refreshMap(false);
-  lastPicks = new Map(top.map(x => [x.l.i, { op: x.o.op, total: x.c.total, save: Math.max(0, first.c.total - x.c.total) }]));
-  $("results").innerHTML = head + top.map((x, n) => {
-    const s = first.c.total - x.c.total;
-    return pickHTML(x, n, t.alongMeta(Math.round(x.at), x.off) + (s > 0.2 ? ` · <em>${t.saves(money(s))}</em>` : ""));
-  }).join("");
+  refreshMap(false);
+  $("results").innerHTML = html;
   wirePicks();
+  $("tripGo")?.addEventListener("click", () => plan.stops.forEach(s => logCharge(s.l.i)));
 }
 function clearRoute() {
-  route = null; document.documentElement.classList.remove("route-on");
+  route = null; document.documentElement.classList.remove("route-on"); setBestLabel();
   rToSel = null; setRouteTxt(); $("routeClear").hidden = true;
   map.getSource("route")?.setData({ type: "FeatureCollection", features: [] });
-  setOriginMarker(null); pinned = new Set(); lastPicks = new Map(); refreshMap(false);
+  setOriginMarker(null); pinned = new Set(); lastPicks = new Map(); tripPlan = null; setStopsOnMap([]); refreshMap(false);
   $("results").innerHTML = ""; document.querySelector(".legend").hidden = false;
   requestAnimationFrame(() => snapSheet(sheetState, false));
 }
@@ -1049,7 +1206,7 @@ function applyLang() {
   $("carSearch").placeholder = T().carSearchPh;
   if ($("kwh").options.length) setKwhOptions();
   if (!$("onboard").hidden) renderCarList();
-  buildTabs();
+  buildTabs(); buildTripControls(); setBestLabel();
   $("rFrom").placeholder = T().fromPh; $("rTo").placeholder = T().toPh;
   setRouteTxt();
   renderAccount();
