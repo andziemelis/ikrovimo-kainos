@@ -6,7 +6,7 @@ const FIREBASE_CONFIG = null;   // when sign-in is switched on, also allow https
 // Never let another site show this app inside a frame (stops "clickjacking" tricks).
 if (window.top !== window.self) { try { window.top.location = window.location.href; } catch { document.documentElement.innerHTML = ""; } }
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
-const DATA_URL = "data/lt.json";
+const DATA_FILES = ["data/lt.json", "data/pl.json"];   // Lithuania (Via Lietuva) and Poland (EIPA, UDT)
 const SEARCH_KM = 25;          // look this far (straight line); the cost model decides what is worth it
 const ROAD_FACTOR = 1.3;       // roads are ~30% longer than a straight line
 const CAR_DEFAULTS = { cons: 17, wear: 0.05, timeVal: 6 }; // kWh/100 km, €/km (tyres, servicing, depreciation), €/h
@@ -35,6 +35,7 @@ const kwhPrice = n => money(n) + "/kWh";
 const translateTariff = s => lang === "lt" ? s : s.replace(/€\/val\. parkavimo mokestis/g, "€/h parking fee").replace(/Nemokamai?/g, "Free");
 function km(a, b, c, d) { const r = Math.PI / 180, dl = (c - a) * r, dn = (d - b) * r; const x = Math.sin(dl / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dn / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); }
 function townOf(l) {
+  if (l.city) return l.city;
   let best = "", bd = 1e9;
   for (const [n, la, lo] of TOWNS) { const d = km(l.la, l.lo, la, lo); if (d < bd) { bd = d; best = n; } }
   if (bd < 5) return best;
@@ -50,7 +51,7 @@ function toast(msg, ms = 3500, sub = "") {
 }
 
 // ---------- state ----------
-let L = [], DATA = null, selected = null, userPos = null, lastOrigin = null;
+let L = [], DATA = null, FX = {}, selected = null, userPos = null, lastOrigin = null;
 let homeLoc = store.get("home", null);              // [lat, lon] or null
 let car = { ...CAR_DEFAULTS, ...store.get("car", {}) };
 let fastOnly = store.get("fastOnly", false), hideUnknown = store.get("hideUnknown", false);
@@ -265,6 +266,7 @@ function select(i, fly = true) {
       <button class="swipe-thumb" id="swipeThumb" aria-label="${t.navigate}"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
     <div class="via">${app ? `${t.viaApp(NAV_NAMES[app])} · <button class="linkbtn" id="changeApp">${t.changeLbl}</button>` : ""}</div>
+    ${l.cc === "PL" && FX.PL ? `<div class="inf">${t.plnNote(FX.PL.toFixed(2).replace(".", lang === "lt" ? "," : "."))}</div>` : ""}
     ${payHTML(l)}
     ${l.offers.length > 1 ? `<div class="inf">${t.manyCompanies(l.offers.length, priced)}</div>` : ""}
     ${l.offers.some(x => x.pk) ? `<div class="warn">${t.parkingWarn}</div>` : ""}
@@ -324,10 +326,14 @@ function payHTML(l) {
   for (const x of l.offers) {
     if (seen.has(x.op)) continue; seen.add(x.op);
     const o = opInfo(x.op), href = o && appLink(o);
-    const ways = (o?.adhoc || []).map(k => `<li>${t["adhoc_" + k]}</li>`).join("");
+    const keys = [...(o?.adhoc || [])];
+    if (x.pay & 1 && !keys.includes("card")) keys.push("card");       // EIPA: bank card at the charger
+    if (x.pay & 4 && !keys.includes("noreg")) keys.push("open");      // EIPA: no registration needed
+    if (x.pay & 8) keys.push("cash");
+    const ways = keys.map(k => `<li>${t["adhoc_" + k]}</li>`).join("");
     rows.push(`<div class="pay-op">
       <div class="pay-top"><span class="pay-ic" aria-hidden="true">${esc(String(x.op).trim().slice(0, 1).toUpperCase())}</span>
-        <span class="pay-name"><b>${esc(x.op)}</b><em>${!o ? t.payUnknown : o.inApp === "wallets" ? t.payInAppWallets : o.inApp === "unsure" ? t.payOpApp : t.payInApp}</em></span>
+        <span class="pay-name"><b>${esc(x.op)}</b><em>${!o ? (x.pay & 2 ? t.payInApp : t.payUnknown) : o.inApp === "wallets" ? t.payInAppWallets : o.inApp === "unsure" ? t.payOpApp : t.payInApp}</em></span>
         ${href ? `<a class="pay-btn" data-pay href="${href}" target="_blank" rel="noopener">${t.payIn(esc(o.app))}</a>` : ""}</div>
       ${ways ? `<div class="pay-alt"><span>${t.payNoApp}</span><ul>${ways}</ul></div>` : ""}
     </div>`);
@@ -1243,11 +1249,17 @@ $("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedInd
 // ---------- load ----------
 applyLang(); setChips(); setKwhOptions(); initAuth(); requestAnimationFrame(() => snapSheet("half", false));
 if (!store.get("onboarded", false)) openOnboard();
-const dataReady = fetch(DATA_URL, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
-  DATA = d;
+const dataReady = Promise.allSettled(DATA_FILES.map(u => fetch(u, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))).then(res => {
+  const files = res.filter(r => r.status === "fulfilled").map(r => r.value);
+  if (!files.length) throw new Error("no data");
+  DATA = files.find(d => !d.cc) || files[0];        // Lithuania drives the "prices updated" line
   const ct = c => [(c & 1) && "Type 2", (c & 2) && "CCS", (c & 4) && "CHAdeMO"].filter(Boolean).join(", ") || "—";
-  L = d.s.map(([la, lo, kw, n, c, offers], i) => ({ i, la, lo, kw, n, ctb: c, ctxt: ct(c),
-    offers: offers.map(([op, m, ac, dc, fl, tt]) => ({ op: d.ops[op], m: (fl & 1) ? 0 : m, ac, dc, f: fl & 1, fo: fl & 2, pk: fl & 4, fx: fl & 8, t: tt.map(j => d.T[j]) })) }));
+  L = [];
+  for (const d of files) {
+    const cc = d.cc || "LT"; if (d.rate) FX[cc] = d.rate;
+    for (const [la, lo, kw, n, c, offers, city] of d.s) L.push({ i: L.length, la, lo, kw, n, ctb: c, ctxt: ct(c), cc, city: city || "",
+      offers: offers.map(([op, m, ac, dc, fl, tt, pay]) => ({ op: d.ops[op], m: (fl & 1) ? 0 : m, ac, dc, f: fl & 1, fo: fl & 2, pk: fl & 4, fx: fl & 8, t: tt.map(j => d.T[j]), pay: pay || 0 })) });
+  }
   setUpdated(); updateStats();
 }).catch(() => toast(T().loadFail, 8000));
 map.on("load", () => {

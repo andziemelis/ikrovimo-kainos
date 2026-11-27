@@ -102,10 +102,12 @@ const I18N = {
     noneNear: r => `${r} km spinduliu nėra vietų su paskelbtomis kainomis.`,
     locating: "Nustatoma jūsų vieta…",
     locFailed: "Nepavyko nustatyti vietos",
-    updated: d => `Kainos atnaujintos ${d} · Duomenys: Via Lietuva`,
+    updated: d => `Kainos atnaujintos ${d} · Duomenys: Via Lietuva, EIPA (Lenkija)`,
     loadFail: "Nepavyko įkelti įkrovimo duomenų. Pabandykite vėliau.",
     cityPrefix: "šalia",
     aboutBtn: "Apie",
+    adhoc_open: "galima krauti be registracijos", adhoc_cash: "grynaisiais pinigais",
+    plnNote: r => `Kaina Lenkijoje skelbiama zlotais; perskaičiuota eurais Europos centrinio banko kursu (1 € = ${r} zł).`,
     replan: "Perskaičiuoti kelionę",
     battNow: "Baterija dabar:", modeCheap: "Pigiausia", modeFast: "Greičiausia", roundTrip: "Į abi puses",
     tripHead: (d, t) => `Kelionė · ${d} · ${t}`,
@@ -116,7 +118,7 @@ const I18N = {
     consNote: (c, mw, w) => `Skaičiuojamos sąnaudos ~${c} kWh/100 km${mw ? " (greitkelis" + (w ? ", žiema)" : ")") : w ? " (žiema)" : ""} · atvykstama su ≥10 %`,
     noCarBatt: "automobilis nepasirinktas, skaičiuojama 60 kWh baterija",
     cheaperAvg: m => `${m} pigiau nei vidutinė greitojo įkrovimo kaina pakeliui`,
-    outOfData: (r, left) => `Toliau pakeliui mūsų duomenyse greitųjų stotelių nėra (rodome tik Lietuvą). Su 80 % nuvažiuosite ~${r} km iš likusių ${left} km.`,
+    outOfData: (r, left) => `Toliau pakeliui mūsų duomenyse greitųjų stotelių nėra (rodome Lietuvą ir Lenkiją). Su 80 % nuvažiuosite ~${r} km iš likusių ${left} km.`,
     cantReach: p => `Su ${p} % baterijos iki artimiausios greitosios stotelės pakeliui nenuvažiuosite. Įkraukite prieš išvykdami.`,
     nearDestHead: k => `Pigiausia įkrauti atvykus (~${k} kWh iki 80 %)`,
     destMeta: (d, p) => `${d} km nuo tikslo · ${p}`,
@@ -178,7 +180,7 @@ const I18N = {
       <p><b>Kainos</b> – tai operatorių paskelbti tarifai iš Lietuvos nacionalinės įkrovimo prieigų duomenų bazės. Jei vietoje skelbiamos kelios kainos, rodoma mažiausia, todėl tikroji kaina gali būti didesnė, priklausomai nuo įkroviklio, mokėjimo būdo ar narystės. Kainos yra orientacinės.</p>
       <p>Duomenų bazėje yra ir viešos, ir pusiau viešos (pvz., biurų ar gyvenamųjų namų aikštelių) prieigos, todėl kai kurios labai pigios ar nemokamos vietos gali būti prieinamos ne visiems.</p>
       <p><b>Privatumas:</b> jūsų buvimo vieta naudojama tik jūsų įrenginyje ir niekur nesiunčiama. Namų vieta ir automobilio nustatymai saugomi tik šiame įrenginyje.</p><p><b>Kaip skaičiuojama:</b> lyginama visa kaina – įkrovimas plius kelionė pirmyn ir atgal (elektra, automobilio dėvėjimasis ir jūsų laikas). Atstumas vertinamas apytiksliai (tiesi linija × 1,3).</p>
-      <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Automobilių duomenys: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
+      <p>Įkrovimo duomenys: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB „Via Lietuva“</a>, licencija <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (duomenys sugrupuoti pagal vietą, kainos supaprastintos). Lenkijos duomenys: <a href="https://eipa.udt.gov.pl/" target="_blank" rel="noopener">EIPA, Urząd Dozoru Technicznego</a>; kainos perskaičiuotos iš zlotų Europos centrinio banko kursu. Automobilių duomenys: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Žemėlapis: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> autoriai.</p>`
   },
   en: {
     slideToNav: "Slide to navigate",
@@ -282,10 +284,12 @@ const I18N = {
     noneNear: r => `No locations with published prices within ${r} km.`,
     locating: "Finding your location…",
     locFailed: "Couldn't get your location",
-    updated: d => `Prices updated ${d} · Data: Via Lietuva`,
+    updated: d => `Prices updated ${d} · Data: Via Lietuva, EIPA (Poland)`,
     loadFail: "Couldn't load the charging data. Please try again later.",
     cityPrefix: "near",
     aboutBtn: "About",
+    adhoc_open: "you can charge without registering", adhoc_cash: "cash",
+    plnNote: r => `Prices in Poland are set in złoty; converted to euros at the European Central Bank rate (€1 = ${r} zł).`,
     replan: "Recalculate trip",
     battNow: "Battery now:", modeCheap: "Cheapest", modeFast: "Fastest", roundTrip: "Round trip",
     tripHead: (d, t) => `Trip · ${d} · ${t}`,
@@ -296,7 +300,7 @@ const I18N = {
     consNote: (c, mw, w) => `Using ~${c} kWh/100 km${mw ? " (motorway" + (w ? ", winter)" : ")") : w ? " (winter)" : ""} · arriving with ≥10%`,
     noCarBatt: "no car chosen, assuming a 60 kWh battery",
     cheaperAvg: m => `${m} cheaper than the average fast-charging price on the way`,
-    outOfData: (r, left) => `Further on we have no fast chargers in our data (Lithuania only). With 80% you'll cover ~${r} km of the remaining ${left} km.`,
+    outOfData: (r, left) => `Further on we have no fast chargers in our data (Lithuania and Poland only). With 80% you'll cover ~${r} km of the remaining ${left} km.`,
     cantReach: p => `With ${p}% battery you can't reach the nearest fast charger on the way. Charge before you leave.`,
     nearDestHead: k => `Cheapest to charge when you arrive (~${k} kWh to 80%)`,
     destMeta: (d, p) => `${d} km from destination · ${p}`,
@@ -358,6 +362,6 @@ const I18N = {
       <p><b>Prices</b> are the operators' own published tariffs from Lithuania's national charging database. Where a location lists several prices, the lowest is shown, so the real price can be higher depending on the charger, payment method or membership. Treat prices as estimates.</p>
       <p>The database covers both public and semi-public chargers (for example in office or residential car parks), so some very cheap or free spots may only be open to certain users.</p>
       <p><b>Privacy:</b> your location is only used on your device and is never sent anywhere. Your home location and car settings are saved on this device only.</p><p><b>How it ranks:</b> by total cost, meaning the charge plus the trip there and back (electricity, car wear and your time). Distances are estimated (straight line × 1.3).</p>
-      <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Car data: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
+      <p>Charging data: <a href="https://ev.vialietuva.lt/en/data-provision" target="_blank" rel="noopener">AB Via Lietuva</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (grouped by location, prices simplified). Poland: <a href="https://eipa.udt.gov.pl/" target="_blank" rel="noopener">EIPA, Urząd Dozoru Technicznego</a>; prices converted from złoty at the European Central Bank rate. Car data: <a href="https://github.com/KilowattApp/open-ev-data" target="_blank" rel="noopener">Open EV Data</a>. Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.</p>`
   }
 };

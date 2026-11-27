@@ -1,11 +1,18 @@
 name: Update charging data
 
-# Downloads Via Lietuva's open charging data every 30 minutes and
-# commits data/lt.json when prices or stations have changed.
+# Every 30 minutes: download Lithuania's open charging data (Via Lietuva) and Poland's register (EIPA),
+# and commit data/lt.json and data/pl.json when prices or stations have changed.
+# EIPA allows 10 downloads per hour of each static file and 240 of the price file; this uses 2 of each.
 on:
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "scripts/build_data.py"
+      - "scripts/build_pl.py"
+      - ".github/workflows/update-data.yml"
 
 permissions:
   contents: write
@@ -17,7 +24,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       # pinned to exact commits so a moved tag can never run other code with write access
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -26,18 +33,36 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build data/lt.json
+      - name: Build data/lt.json (Lithuania)
+        id: lt
+        continue-on-error: true
         run: python scripts/build_data.py
 
-      - name: Commit if changed
+      - name: Build data/pl.json (Poland)
+        id: pl
+        continue-on-error: true
+        env:
+          EIPA_OPERATORS: ${{ secrets.EIPA_OPERATORS }}
+          EIPA_POOLS: ${{ secrets.EIPA_POOLS }}
+          EIPA_STATIONS: ${{ secrets.EIPA_STATIONS }}
+          EIPA_POINTS: ${{ secrets.EIPA_POINTS }}
+          EIPA_DYNAMIC: ${{ secrets.EIPA_DYNAMIC }}
+        run: python scripts/build_pl.py
+
+      - name: Commit what changed
         run: |
-          # publication time changes on every download, so compare everything except it
-          if git diff --quiet -- data/lt.json; then echo "No change"; exit 0; fi
-          if ! python scripts/data_changed.py; then
-            echo "Only the timestamp changed"; git checkout -- data/lt.json; exit 0
-          fi
+          changed=""
+          for f in data/lt.json data/pl.json; do
+            [ -f "$f" ] || continue
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1 && git diff --quiet -- "$f"; then continue; fi
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1 && ! python scripts/data_changed.py "$f"; then
+              git checkout -- "$f"; continue          # only timestamps changed
+            fi
+            changed="$changed $f"
+          done
+          if [ -z "$changed" ]; then echo "No change"; exit 0; fi
           git config user.name "data-bot"
           git config user.email "data-bot@users.noreply.github.com"
-          git add data/lt.json
+          git add $changed
           git commit -m "Update charging data"
-          git push
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
