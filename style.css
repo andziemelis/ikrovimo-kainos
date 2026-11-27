@@ -615,3 +615,19 @@ html.tab-account .top,html.tab-account .panel,html.tab-account .fab{display:none
 .pay-top{display:grid;grid-template-columns:38px minmax(0,1fr);column-gap:12px;align-items:center}
 .pay-btn{grid-column:2;justify-self:start;margin-top:10px}
 .pay-alt{margin-left:50px}
+
+/* ===== Wallet: card for the subscription ===== */
+.w-card{position:relative;height:170px;margin:12px 0 14px;border-radius:20px;padding:20px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;overflow:hidden;
+  background:radial-gradient(120% 90% at 100% 0%,rgba(61,107,255,.28),transparent 60%),linear-gradient(160deg,#1a2030,#0f1219);
+  border:1.5px dashed rgba(157,184,255,.35)}
+.w-card::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;border:1px solid rgba(157,184,255,.12)}
+.w-chip{position:absolute;top:20px;left:20px;width:40px;height:30px;border-radius:7px;background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15)}
+.w-num{font-size:19px;letter-spacing:.12em;color:#8f9bb0;font-variant-numeric:tabular-nums}
+.w-none{font-size:13px;color:var(--muted)}
+.wallet .go{width:100%;min-height:52px}
+.w-why{margin:10px 2px 14px;line-height:1.4}
+.w-sub{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);margin-bottom:12px}
+.w-sub div{display:flex;flex-direction:column;gap:3px}
+.w-sub b{font-size:15px}
+.w-sub span{font-size:13px;color:var(--muted)}
+.w-sub .w-tag{flex:none;font-size:12px;font-weight:700;color:#cfdcff;padding:5px 10px;border-radius:999px;background:rgba(61,107,255,.18);border:1px solid rgba(157,184,255,.25)}

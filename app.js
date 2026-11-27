@@ -472,13 +472,10 @@ function logCharge(i) {
   store.set("log", log.slice(-200));
 }
 function monthLog() { const d = new Date(), m0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime(); return store.get("log", []).filter(e => e.t >= m0); }
-function openWallet() {
-  const t = T(), ml = monthLog(), saved = ml.reduce((a, e) => a + e.save, 0);
-  $("wSub").textContent = t.walletSub(ml.length);
-  $("wList").innerHTML = ml.slice(-5).reverse().map(e => `<div class="w-row"><span>${e.op}<em>${new Date(e.t).toLocaleDateString(lang === "lt" ? "lt-LT" : "en-GB", { day: "numeric", month: "short" })}</em></span><b>${money(e.total)}</b></div>`).join("");
-  $("walletModal").hidden = false;
-  typeAmount($("wAmt"), saved);
-}
+// Wallet: only a payment card for the future subscription. Charging itself is paid in the operator's app.
+// No card can be saved yet: that needs sign-in and a payment provider (e.g. Stripe) behind the app.
+function openWallet() { $("walletModal").hidden = false; }
+$("addCardBtn").onclick = () => toast(T().cardSoon, 4000, T().cardSoonSub);
 $("walletClose").onclick = () => $("walletModal").hidden = true;
 $("walletModal").addEventListener("click", e => { if (e.target.id === "walletModal") $("walletModal").hidden = true; });
 
@@ -527,9 +524,9 @@ function setTab(v) {
   else requestAnimationFrame(() => snapSheet(sheetState, false));
 }
 function renderAccount() {
-  const t = T(), ml = monthLog(), saved = ml.reduce((a, e) => a + e.save, 0);
+  const t = T();
   $("liCarVal").textContent = myCar ? [myCar[0], myCar[1]].filter(Boolean).join(" ") : t.noCar;
-  $("liWalletVal").textContent = saved > 0 ? t.savedShort(money(saved)) : "";
+  $("liWalletVal").textContent = t.noCardShort;
   $("acctFoot").textContent = t.acctFoot;
   if (authUser) { $("acctHead").textContent = authUser.displayName || authUser.email || ""; $("acctSub").textContent = ""; $("acctBtns").hidden = true; }
 }
