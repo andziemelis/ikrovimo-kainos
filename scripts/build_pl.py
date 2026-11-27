@@ -87,6 +87,19 @@ def bits(v):
         return 0
 
 
+LEGAL = re.compile(r"[\s,]*(sp[óo]?[łl]ka\b.*|sp\.?\s*z\s*o\.?\s*o\.?.*|s\.?\s*a\.?$|sp\.?\s*k\.?$|sp\.?\s*j\.?$|s\.?\s*c\.?$|gmbh$|ag$|ltd\.?$|b\.?\s*v\.?$|as$|uab$)", re.I)
+COUNTRY = re.compile(r"\s+(Polska|Poland)\b", re.I)
+
+
+def short_name(s):
+    """'GreenWay Polska Sp. z o.o.' -> 'GreenWay', 'Lidl sp. z o.o. sp. k.' -> 'Lidl'."""
+    s = clean(s, 80)
+    for _ in range(3):
+        s = LEGAL.sub("", s).strip(" .,-")
+    s = COUNTRY.sub("", s).strip(" .,-")
+    return s[:40] or clean(s, 40)
+
+
 def money_pl(v):
     return f"{v:.2f}".replace(".", ",")
 
@@ -101,7 +114,7 @@ def main():
     rate = FALLBACK_PLN_PER_EUR if folder else pln_per_eur()
     pub = clean(dynamic.get("generated"), 40)
 
-    ops = {o.get("id"): clean(o.get("short_name") or o.get("name"), 60) for o in operators}
+    ops = {o.get("id"): short_name(o.get("short_name") or o.get("name")) or "?" for o in operators}
     pool_by_id = {}
     for p in pools:
         try:
