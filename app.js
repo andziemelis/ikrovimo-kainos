@@ -700,8 +700,10 @@ async function planRoute() {
 //     The plan with the lowest total wins.
 //  4. "Fastest" is the same formula with time weighted very heavily.
 //  5. "Round trip" plans the way there and back as one journey.
-//  6. If the road leaves the area we have stations for, it plans up to the last station and warns you.
+//  6. If the road leaves the area we have stations for, it plans up to the cheapest of the last stations and warns you.
+//  Stops make sense to people: not while the battery is above 50 %, and at least 5 kWh each.
 const RESERVE = 0.10, DC_TARGET = 0.80, SLOW_ABOVE = 0.35, STOP_MIN = 10, DETOUR_KMH = 45, FASTEST_EUR_H = 300;
+const MAX_ARRIVE = 0.50, MIN_Q = 5;   // nobody stops to charge with more than half a battery, or for a couple of kWh
 let tripSoc = store.get("tripSoc", 80), tripMode = store.get("tripMode", "cheap"), roundTrip = store.get("roundTrip", false);
 let tripPlan = null;
 function tripCar() {
@@ -744,7 +746,7 @@ function stationsAlong(legs) {
   }
   return out;
 }
-function planTrip() {
+function planTrip(strict = true) {
   const tc = tripCar(), B = tc.batt, legs = roundTrip ? [route.coords, route.coords.slice().reverse()] : [route.coords];
   const total = route.dist * legs.length, dur = route.dur * legs.length;
   const cons = tripConsumption(route.dist, route.dur), kwhPerKm = cons.per100 / 100;
@@ -761,7 +763,7 @@ function planTrip() {
   if (E(0, END) <= firstBudget) return { kind: "none", total, dur, cons, tc, arrive: (s0 * B - E(0, END)) / B, near };
   // state k: 0 = reached straight from the start (arrives with what is left of the start charge), 1 = from a stop (arrives at the reserve)
   const best = [new Array(N).fill(null), new Array(N).fill(null)];
-  for (let j = 1; j < END; j++) if (E(0, j) <= firstBudget) best[0][j] = { obj: 0, money: 0, min: 0, prev: null };
+  for (let j = 1; j < END; j++) if (E(0, j) <= firstBudget && (!strict || (s0 * B - E(0, j)) / B <= MAX_ARRIVE)) best[0][j] = { obj: 0, money: 0, min: 0, prev: null };
   const cap = B, maxLeg = (cap - RESERVE * B) / kwhPerKm + 10;
   let bestEnd = null;
   for (let i = 1; i < END; i++) for (let k = 0; k < 2; k++) {
@@ -769,8 +771,8 @@ function planTrip() {
     const n = nodes[i], arrive = k === 0 ? s0 * B - E(0, i) : RESERVE * B;
     for (let j = i + 1; j < N; j++) {
       if (nodes[j].at - n.at > maxLeg) break;
-      const need = E(i, j) + RESERVE * B - arrive;
-      if (need < 1 || arrive + need > cap + 0.01) continue;
+      const need = Math.max(E(i, j) + RESERVE * B - arrive, strict ? MIN_Q : 1);
+      if (E(i, j) + RESERVE * B - arrive <= 0 || arrive + need > cap + 0.01) continue;
       const min = chargeMin(n.rate, arrive, need, B) + STOP_MIN + 2 * n.d / DETOUR_KMH * 60;
       const money = n.p * need, obj = s.obj + money + min / 60 * val;
       const cand = { obj, money: s.money + money, min: s.min + min, prev: [i, k], q: need, arrive };
@@ -791,9 +793,17 @@ function planTrip() {
     return { kind: "stops", total, dur, cons, tc, stops: plan, money: bestEnd.money, min: bestEnd.min, arrive: RESERVE, avgP, near };
   }
   // no full plan: the road runs past the stations we know (e.g. abroad) or the battery is too low to reach the first one
-  let far = null;
-  for (let j = 1; j < END; j++) for (let k = 0; k < 2; k++) { const s = best[k][j]; if (s && (!far || nodes[j].at > nodes[far[0]].at)) far = [j, k]; }
-  if (!far) return { kind: "unreachable", total, dur, cons, tc, near };
+  if (strict) { const loose = planTrip(false); if (loose.kind === "stops") return loose; }
+  let maxAt = -1;
+  for (let j = 1; j < END; j++) if (best[0][j] || best[1][j]) maxAt = Math.max(maxAt, nodes[j].at);
+  if (maxAt < 0) return { kind: "unreachable", total, dur, cons, tc, near };
+  let far = null, farObj = Infinity;
+  for (let j = 1; j < END; j++) for (let k = 0; k < 2; k++) {
+    const s = best[k][j]; if (!s || nodes[j].at < maxAt - 40) continue;
+    const arr = k === 0 ? s0 * B - E(0, j) : RESERVE * B, q = Math.max(0, DC_TARGET * B - arr);
+    const obj = s.obj + nodes[j].p * q + (chargeMin(nodes[j].rate, arr, q, B) + STOP_MIN) / 60 * val - nodes[j].at / total * 5;   // small bonus for getting further
+    if (obj < farObj) { farObj = obj; far = [j, k]; }
+  }
   const [fj, fk] = far, fn = nodes[fj], arriveF = fk === 0 ? s0 * B - E(0, fj) : RESERVE * B, qF = Math.max(0, DC_TARGET * B - arriveF);
   const plan = walk(best[fk][fj]);
   plan.push({ ...fn, q: qF, socIn: arriveF / B, socOut: DC_TARGET, min: chargeMin(fn.rate, arriveF, qF, B) + STOP_MIN, last: true });
