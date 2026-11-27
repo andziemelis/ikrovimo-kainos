@@ -1055,7 +1055,7 @@ function buildKwhSeg() {
 // Floating buttons ride just above it. On a computer it is a fixed side panel instead.
 const isPhone = () => window.innerWidth < 760;
 const sheet = $("panel");
-let sheetState = "half", sheetY = 0, snaps = { full: 0, half: 0, peek: 0 };
+let sheetState = "peek", sheetY = 0, snaps = { full: 0, half: 0, peek: 0 };
 function measureSheet() {
   const H = sheet.offsetHeight, vh = window.innerHeight;
   const anchor = $("detail").hidden ? sheet.querySelector(".actions") : $("dAmt");
@@ -1247,7 +1247,7 @@ $("bestBtn").onclick = () => route ? routeBest() : bestCharge();
 $("kwh").onchange = () => { store.set("kwhAuto", !!myCar && $("kwh").selectedIndex === 0); refreshMap(false); if ($("results").innerHTML) rerun(); if (selected != null) select(selected, false); };
 
 // ---------- load ----------
-applyLang(); setChips(); setKwhOptions(); initAuth(); requestAnimationFrame(() => snapSheet("half", false));
+applyLang(); setChips(); setKwhOptions(); initAuth(); requestAnimationFrame(() => snapSheet("peek", false));   // open with the menu down, map first
 if (!store.get("onboarded", false)) openOnboard();
 const dataReady = Promise.allSettled(DATA_FILES.map(u => fetch(u, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))).then(res => {
   const files = res.filter(r => r.status === "fulfilled").map(r => r.value);
